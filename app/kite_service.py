@@ -154,12 +154,12 @@ class KiteService:
         return df[["open", "high", "low", "close"]]
 
     @staticmethod
-    def login_url_from_env() -> str:
+    def login_url_from_env(api_key_override: Optional[str] = None) -> str:
         if KiteConnect is None:
             raise RuntimeError("kiteconnect is not installed. Add it to requirements.txt")
-        api_key = os.environ.get("KITE_API_KEY")
+        api_key = api_key_override or os.environ.get("KITE_API_KEY")
         if not api_key:
-            raise RuntimeError("Missing KITE_API_KEY env var")
+            raise RuntimeError("Missing api_key. Pass ?api_key=... or set KITE_API_KEY env var")
         client = KiteConnect(api_key=api_key)
         return client.login_url()
 

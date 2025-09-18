@@ -45,22 +45,25 @@ async def backtest_endpoint(
 
 
 @app.get("/login_url")
-async def login_url():
-    url = KiteService.login_url_from_env()
-    return {"login_url": url}
+async def login_url(api_key: str | None = None):
+    try:
+        url = KiteService.login_url_from_env(api_key_override=api_key)
+        return {"login_url": url}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
 
 
 @app.get("/auth/callback")
-async def auth_callback(request_token: str, api_secret: str | None = None):
+async def auth_callback(request_token: str, api_secret: str | None = None, api_key: str | None = None):
     # Exchange request_token for access_token
-    api_key = os.environ.get("KITE_API_KEY")
-    if not api_key:
-        return JSONResponse({"error": "KITE_API_KEY not set"}, status_code=400)
+    key = api_key or os.environ.get("KITE_API_KEY")
+    if not key:
+        return JSONResponse({"error": "Missing api_key. Pass ?api_key=... or set KITE_API_KEY"}, status_code=400)
     # Prefer provided api_secret, else read from env
     secret = api_secret or os.environ.get("KITE_API_SECRET")
     if not secret:
         return JSONResponse({"error": "KITE_API_SECRET not provided or set"}, status_code=400)
-    access_token = KiteService.exchange_request_token(api_key=api_key, api_secret=secret, request_token=request_token)
+    access_token = KiteService.exchange_request_token(api_key=key, api_secret=secret, request_token=request_token)
     # Optionally persist to token file
     token_path = os.environ.get("KITE_TOKEN_PATH", "/tmp/kite_token.json")
     try:

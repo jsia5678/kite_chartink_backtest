@@ -10,12 +10,14 @@ import json
 import pandas as pd
 import pytz
 
+IMPORT_ERR: Optional[BaseException] = None
 try:
     from kiteconnect import KiteConnect
     from kiteconnect.exceptions import RateLimitException
-except Exception:  # pragma: no cover
+except Exception as e:  # pragma: no cover
     KiteConnect = None  # type: ignore
     RateLimitException = Exception  # type: ignore
+    IMPORT_ERR = e
 
 
 @dataclass
@@ -28,7 +30,7 @@ class Instrument:
 class KiteService:
     def __init__(self, api_key: str, access_token: str) -> None:
         if KiteConnect is None:
-            raise RuntimeError("kiteconnect is not installed. Add it to requirements.txt")
+            raise RuntimeError(f"kiteconnect import error: {IMPORT_ERR}")
         self.client = KiteConnect(api_key=api_key)
         self.client.set_access_token(access_token)
         self._instruments_cache: Optional[pd.DataFrame] = None
@@ -55,7 +57,7 @@ class KiteService:
         # If still missing, try generating it using request token + secret
         if not access_token and request_token and api_secret:
             if KiteConnect is None:
-                raise RuntimeError("kiteconnect is not installed. Add it to requirements.txt")
+                raise RuntimeError(f"kiteconnect import error: {IMPORT_ERR}")
             tmp_client = KiteConnect(api_key=api_key)
             data = tmp_client.generate_session(request_token, api_secret=api_secret)
             access_token = data["access_token"]
@@ -75,7 +77,7 @@ class KiteService:
     @staticmethod
     def exchange_request_token(api_key: str, api_secret: str, request_token: str) -> str:
         if KiteConnect is None:
-            raise RuntimeError("kiteconnect is not installed. Add it to requirements.txt")
+            raise RuntimeError(f"kiteconnect import error: {IMPORT_ERR}")
         client = KiteConnect(api_key=api_key)
         data = client.generate_session(request_token=request_token, api_secret=api_secret)
         return data["access_token"]
@@ -156,7 +158,7 @@ class KiteService:
     @staticmethod
     def login_url_from_env(api_key_override: Optional[str] = None) -> str:
         if KiteConnect is None:
-            raise RuntimeError("kiteconnect is not installed. Add it to requirements.txt")
+            raise RuntimeError(f"kiteconnect import error: {IMPORT_ERR}")
         api_key = api_key_override or os.environ.get("KITE_API_KEY")
         if not api_key:
             raise RuntimeError("Missing api_key. Pass ?api_key=... or set KITE_API_KEY env var")

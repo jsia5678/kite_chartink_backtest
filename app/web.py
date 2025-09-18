@@ -63,7 +63,10 @@ async def auth_callback(request: Request, request_token: str, api_secret: str | 
     secret = api_secret or request.cookies.get("kite_api_secret") or os.environ.get("KITE_API_SECRET")
     if not secret:
         return JSONResponse({"error": "KITE_API_SECRET not provided or set"}, status_code=400)
-    access_token = KiteService.exchange_request_token(api_key=key, api_secret=secret, request_token=request_token)
+    try:
+        access_token = KiteService.exchange_request_token(api_key=key, api_secret=secret, request_token=request_token)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
     # Optionally persist to token file
     token_path = os.environ.get("KITE_TOKEN_PATH", "/tmp/kite_token.json")
     try:

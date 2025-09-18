@@ -29,18 +29,11 @@
 
       <section class="card">
         <h2>Auth</h2>
-        <form action="/ui/login" method="post" class="grid">
-          <label>API Key
-            <input type="text" name="api_key" placeholder="KITE_API_KEY" required />
-          </label>
-          <label>API Secret
-            <input type="password" name="api_secret" placeholder="KITE_API_SECRET" required />
-          </label>
-          <div style="align-self:end">
-            <button type="submit">Login with Kite</button>
-          </div>
-        </form>
-        <p>Set your Redirect URL to <code>https://YOUR_DOMAIN/auth/callback</code>. After login, the app exchanges the token and shows your access token.</p>
+        <p>
+          To authenticate with Kite, first <a href="/login_url" target="_blank">get a login URL</a>.
+          Set your Redirect URL to <code>https://YOUR_DOMAIN/auth/callback</code>. After login,
+          the app will exchange the token and show your access token.
+        </p>
       </section>
     </main>
   </body>

@@ -77,22 +77,6 @@ async def auth_callback(request: Request, request_token: str, api_secret: str | 
     return {"access_token": access_token, "saved_to": token_path}
 
 
-@app.post("/ui/login")
-async def ui_login(request: Request, api_key: str = Form(...), api_secret: str = Form(...)):
-    # Set short-lived cookies with api_key and api_secret, then redirect to Kite login URL
-    try:
-        url = KiteService.login_url_from_env(api_key_override=api_key)
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=400)
-
-    response = RedirectResponse(url, status_code=303)
-    # Short-lived cookies (10 minutes)
-    max_age = 10 * 60
-    response.set_cookie("kite_api_key", api_key, max_age=max_age, httponly=True, secure=True, samesite="lax")
-    response.set_cookie("kite_api_secret", api_secret, max_age=max_age, httponly=True, secure=True, samesite="lax")
-    return response
-
-
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     return templates.TemplateResponse(

@@ -1,0 +1,69 @@
+from __future__ import annotations
+
+import io
+import os
+from typing import Optional
+
+import pandas as pd
+import pytz
+from fastapi import FastAPI, File, UploadFile, Form
+from fastapi.responses import JSONResponse, StreamingResponse
+
+from .engine import run_backtest_from_csv
+from .kite_service import KiteService
+
+app = FastAPI(title="Kite Chartink Backtester")
+
+
+@app.post("/backtest")
+async def backtest_endpoint(
+    file: UploadFile = File(...),
+    days: int = Form(...),
+    exchange: str = Form(default=os.environ.get("EXCHANGE", "NSE")),
+    tz: str = Form(default=os.environ.get("MARKET_TZ", "Asia/Kolkata")),
+    output: str = Form(default="json"),
+):
+    # Save uploaded file to a temp buffer and run backtest
+    content = await file.read()
+    tmp = io.BytesIO(content)
+    # Pandas can read from buffer, but our engine expects a path. Write temp.
+    tmp_path = f"/tmp/{file.filename or 'input.csv'}"
+    with open(tmp_path, "wb") as f:
+        f.write(content)
+
+    df = run_backtest_from_csv(csv_path=tmp_path, num_days=days, exchange=exchange, timezone_name=tz)
+
+    if output == "csv":
+        csv_bytes = df.to_csv(index=False).encode("utf-8")
+        return StreamingResponse(io.BytesIO(csv_bytes), media_type="text/csv")
+    else:
+        return JSONResponse(df.to_dict(orient="records"))
+
+
+@app.get("/login_url")
+async def login_url():
+    url = KiteService.login_url_from_env()
+    return {"login_url": url}
+
+
+@app.get("/auth/callback")
+async def auth_callback(request_token: str, api_secret: str | None = None):
+    # Exchange request_token for access_token
+    api_key = os.environ.get("KITE_API_KEY")
+    if not api_key:
+        return JSONResponse({"error": "KITE_API_KEY not set"}, status_code=400)
+    # Prefer provided api_secret, else read from env
+    secret = api_secret or os.environ.get("KITE_API_SECRET")
+    if not secret:
+        return JSONResponse({"error": "KITE_API_SECRET not provided or set"}, status_code=400)
+    access_token = KiteService.exchange_request_token(api_key=api_key, api_secret=secret, request_token=request_token)
+    # Optionally persist to token file
+    token_path = os.environ.get("KITE_TOKEN_PATH", "/tmp/kite_token.json")
+    try:
+        with open(token_path, "w", encoding="utf-8") as f:
+            f.write('{"access_token": "' + access_token + '"}')
+    except Exception:
+        pass
+    return {"access_token": access_token, "saved_to": token_path}
+
+

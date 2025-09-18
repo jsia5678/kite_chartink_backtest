@@ -13,10 +13,8 @@ import pytz
 IMPORT_ERR: Optional[BaseException] = None
 try:
     from kiteconnect import KiteConnect
-    from kiteconnect.exceptions import RateLimitException
 except Exception as e:  # pragma: no cover
     KiteConnect = None  # type: ignore
-    RateLimitException = Exception  # type: ignore
     IMPORT_ERR = e
 
 
@@ -131,11 +129,16 @@ class KiteService:
                     oi=False,
                 )
                 break
-            except RateLimitException:
-                attempt += 1
-                if attempt >= max_attempts:
+            except Exception as e:
+                # Retry on evident rate-limit messages
+                msg = str(e).lower()
+                if ("429" in msg) or ("rate limit" in msg) or ("too many requests" in msg):
+                    attempt += 1
+                    if attempt >= max_attempts:
+                        raise
+                    time.sleep(1.0 * attempt)
+                else:
                     raise
-                time.sleep(1.0 * attempt)
         if not records:
             return pd.DataFrame()
         df = pd.DataFrame(records)

@@ -59,6 +59,12 @@ print(data["access_token"])  # set as KITE_ACCESS_TOKEN
 
 Docs: [Kite Connect v3 login flow](https://kite.trade/docs/connect/v3/)
 
+## Web UI
+
+- Home: `GET /` → upload CSV, set `days`, optional `exchange` and `tz`.
+- Submit → results are rendered in a table.
+- Static assets in `static/`, templates in `templates/`.
+
 ## CSV Format
 
 Expected columns (case-insensitive, flexible):

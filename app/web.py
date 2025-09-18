@@ -6,13 +6,17 @@ from typing import Optional
 
 import pandas as pd
 import pytz
-from fastapi import FastAPI, File, UploadFile, Form
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi import FastAPI, File, UploadFile, Form, Request
+from fastapi.responses import JSONResponse, StreamingResponse, HTMLResponse
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 
 from .engine import run_backtest_from_csv
 from .kite_service import KiteService
 
 app = FastAPI(title="Kite Chartink Backtester")
+templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 @app.post("/backtest")
@@ -65,5 +69,33 @@ async def auth_callback(request_token: str, api_secret: str | None = None):
     except Exception:
         pass
     return {"access_token": access_token, "saved_to": token_path}
+
+
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
+    return templates.TemplateResponse(
+        "index.html",
+        {
+            "request": request,
+            "default_days": 5,
+            "default_exchange": os.environ.get("EXCHANGE", "NSE"),
+            "default_tz": os.environ.get("MARKET_TZ", "Asia/Kolkata"),
+        },
+    )
+
+
+@app.post("/ui/backtest", response_class=HTMLResponse)
+async def ui_backtest(request: Request, file: UploadFile = File(...), days: int = Form(...), exchange: str = Form("NSE"), tz: str = Form("Asia/Kolkata")):
+    content = await file.read()
+    tmp_path = f"/tmp/{file.filename or 'input.csv'}"
+    with open(tmp_path, "wb") as f:
+        f.write(content)
+
+    df = run_backtest_from_csv(csv_path=tmp_path, num_days=days, exchange=exchange, timezone_name=tz)
+    records = df.to_dict(orient="records")
+    return templates.TemplateResponse(
+        "results.html",
+        {"request": request, "rows": records, "count": len(records)},
+    )
 
 

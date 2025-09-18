@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Backtest results</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>Results ({{ count }})</h1>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Stock</th>
+              <th>Entry Date</th>
+              <th>Entry Time</th>
+              <th>Entry Price</th>
+              <th>Exit Date</th>
+              <th>Exit Price</th>
+              <th>Return %</th>
+              <th>Error</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+            <tr>
+              <td>{{ row["Stock"] }}</td>
+              <td>{{ row["Entry Date"] }}</td>
+              <td>{{ row["Entry Time"] }}</td>
+              <td>{{ row["Entry Price"] }}</td>
+              <td>{{ row["Exit Date"] }}</td>
+              <td>{{ row["Exit Price"] }}</td>
+              <td>{{ row["Return %"] }}</td>
+              <td>{{ row.get("Error", "") }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p><a href="/">Back</a></p>
+    </main>
+  </body>
+  </html>
+
+

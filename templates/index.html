@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kite Backtester</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>Kite Chartink Backtester</h1>
+      <form action="/ui/backtest" method="post" enctype="multipart/form-data" class="card">
+        <label>CSV file
+          <input type="file" name="file" accept=".csv" required />
+        </label>
+        <div class="grid">
+          <label>Days (N)
+            <input type="number" name="days" value="{{ default_days }}" min="1" required />
+          </label>
+          <label>Exchange
+            <input type="text" name="exchange" value="{{ default_exchange }}" />
+          </label>
+          <label>Timezone
+            <input type="text" name="tz" value="{{ default_tz }}" />
+          </label>
+        </div>
+        <button type="submit">Run backtest</button>
+      </form>
+
+      <section class="card">
+        <h2>Auth</h2>
+        <p>
+          To authenticate with Kite, first <a href="/login_url" target="_blank">get a login URL</a>.
+          Set your Redirect URL to <code>https://YOUR_DOMAIN/auth/callback</code>. After login,
+          the app will exchange the token and show your access token.
+        </p>
+      </section>
+    </main>
+  </body>
+  </html>
+
+

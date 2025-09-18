@@ -54,7 +54,7 @@ async def login_url(api_key: str | None = None):
 
 
 @app.get("/auth/callback")
-async def auth_callback(request: Request, request_token: str, api_secret: str | None = None, api_key: str | None = None):
+async def auth_callback(request: Request, request_token: str, api_secret: str | None = None, api_key: str | None = None, format: str | None = None):
     # Exchange request_token for access_token
     key = api_key or request.cookies.get("kite_api_key") or os.environ.get("KITE_API_KEY")
     if not key:
@@ -63,10 +63,7 @@ async def auth_callback(request: Request, request_token: str, api_secret: str | 
     secret = api_secret or request.cookies.get("kite_api_secret") or os.environ.get("KITE_API_SECRET")
     if not secret:
         return JSONResponse({"error": "KITE_API_SECRET not provided or set"}, status_code=400)
-    try:
-        access_token = KiteService.exchange_request_token(api_key=key, api_secret=secret, request_token=request_token)
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=400)
+    access_token = KiteService.exchange_request_token(api_key=key, api_secret=secret, request_token=request_token)
     # Optionally persist to token file
     token_path = os.environ.get("KITE_TOKEN_PATH", "/tmp/kite_token.json")
     try:
@@ -74,7 +71,32 @@ async def auth_callback(request: Request, request_token: str, api_secret: str | 
             f.write('{"access_token": "' + access_token + '"}')
     except Exception:
         pass
-    return {"access_token": access_token, "saved_to": token_path}
+
+    # If JSON requested explicitly, return JSON; otherwise redirect to home with banner
+    accepts = (request.headers.get("accept") or "").lower()
+    if format == "json" or "application/json" in accepts:
+        return {"access_token": access_token, "saved_to": token_path}
+
+    resp = RedirectResponse(url="/?authed=1", status_code=303)
+    # Optional cookie for UX; server reads token file/env, not this cookie
+    resp.set_cookie("kite_access_token", access_token, max_age=12 * 60 * 60, httponly=True, secure=True, samesite="lax")
+    return resp
+
+
+@app.post("/ui/login")
+async def ui_login(request: Request, api_key: str = Form(...), api_secret: str = Form(...)):
+    # Set short-lived cookies with api_key and api_secret, then redirect to Kite login URL
+    try:
+        url = KiteService.login_url_from_env(api_key_override=api_key)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+    response = RedirectResponse(url, status_code=303)
+    # Short-lived cookies (10 minutes)
+    max_age = 10 * 60
+    response.set_cookie("kite_api_key", api_key, max_age=max_age, httponly=True, secure=True, samesite="lax")
+    response.set_cookie("kite_api_secret", api_secret, max_age=max_age, httponly=True, secure=True, samesite="lax")
+    return response
 
 
 @app.get("/", response_class=HTMLResponse)

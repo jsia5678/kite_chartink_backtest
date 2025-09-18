@@ -9,6 +9,9 @@
   <body>
     <main class="container">
       <h1>Kite Chartink Backtester</h1>
+      {% if request.query_params.get('authed') == '1' %}
+      <div class="banner">Kite authentication successful. You can run your backtest now.</div>
+      {% endif %}
       <form action="/ui/backtest" method="post" enctype="multipart/form-data" class="card">
         <label>CSV file
           <input type="file" name="file" accept=".csv" required />
@@ -29,11 +32,18 @@
 
       <section class="card">
         <h2>Auth</h2>
-        <p>
-          To authenticate with Kite, first <a href="/login_url" target="_blank">get a login URL</a>.
-          Set your Redirect URL to <code>https://YOUR_DOMAIN/auth/callback</code>. After login,
-          the app will exchange the token and show your access token.
-        </p>
+        <form action="/ui/login" method="post" class="grid">
+          <label>API Key
+            <input type="text" name="api_key" placeholder="KITE_API_KEY" required />
+          </label>
+          <label>API Secret
+            <input type="password" name="api_secret" placeholder="KITE_API_SECRET" required />
+          </label>
+          <div style="align-self:end">
+            <button type="submit">Login with Kite</button>
+          </div>
+        </form>
+        <p>Set your Redirect URL to <code>https://YOUR_DOMAIN/auth/callback</code>. After login, the app exchanges the token and shows your access token.</p>
       </section>
     </main>
   </body>

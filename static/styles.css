@@ -4,6 +4,7 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:Inter,system-ui,-
 .container{max-width:1000px;margin:0 auto;padding:24px}
 h1,h2{margin:0 0 12px}
 .card{background:var(--card);border:1px solid #202a44;border-radius:10px;padding:16px;margin:16px 0}
+.banner{background:#0f3d2a;border:1px solid #1f6f50;color:#b7f0d1;padding:10px;border-radius:8px;margin:12px 0}
 label{display:block;margin:8px 0 12px;color:var(--muted)}
 input[type="file"],input[type="number"],input[type="text"]{width:100%;padding:10px;border-radius:8px;border:1px solid #263048;background:#0f1424;color:var(--fg)}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}

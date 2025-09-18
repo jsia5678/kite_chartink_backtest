@@ -35,13 +35,15 @@ async def backtest_endpoint(
     with open(tmp_path, "wb") as f:
         f.write(content)
 
-    df = run_backtest_from_csv(csv_path=tmp_path, num_days=days, exchange=exchange, timezone_name=tz)
-
-    if output == "csv":
-        csv_bytes = df.to_csv(index=False).encode("utf-8")
-        return StreamingResponse(io.BytesIO(csv_bytes), media_type="text/csv")
-    else:
-        return JSONResponse(df.to_dict(orient="records"))
+    try:
+        df = run_backtest_from_csv(csv_path=tmp_path, num_days=days, exchange=exchange, timezone_name=tz)
+        if output == "csv":
+            csv_bytes = df.to_csv(index=False).encode("utf-8")
+            return StreamingResponse(io.BytesIO(csv_bytes), media_type="text/csv")
+        else:
+            return JSONResponse(df.to_dict(orient="records"))
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
 
 
 @app.get("/login_url")
@@ -119,11 +121,19 @@ async def ui_backtest(request: Request, file: UploadFile = File(...), days: int 
     with open(tmp_path, "wb") as f:
         f.write(content)
 
-    df = run_backtest_from_csv(csv_path=tmp_path, num_days=days, exchange=exchange, timezone_name=tz)
-    records = df.to_dict(orient="records")
-    return templates.TemplateResponse(
-        "results.html",
-        {"request": request, "rows": records, "count": len(records)},
-    )
+    try:
+        df = run_backtest_from_csv(csv_path=tmp_path, num_days=days, exchange=exchange, timezone_name=tz)
+        records = df.to_dict(orient="records")
+        return templates.TemplateResponse(
+            "results.html",
+            {"request": request, "rows": records, "count": len(records)},
+        )
+    except Exception as e:
+        # Show error on the results page instead of 500
+        return templates.TemplateResponse(
+            "results.html",
+            {"request": request, "rows": [], "count": 0, "error": str(e)},
+            status_code=400,
+        )
 
 

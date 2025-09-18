@@ -7,7 +7,7 @@ from typing import Optional
 import pandas as pd
 import pytz
 from fastapi import FastAPI, File, UploadFile, Form, Request
-from fastapi.responses import JSONResponse, StreamingResponse, HTMLResponse
+from fastapi.responses import JSONResponse, StreamingResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 
@@ -54,13 +54,13 @@ async def login_url(api_key: str | None = None):
 
 
 @app.get("/auth/callback")
-async def auth_callback(request_token: str, api_secret: str | None = None, api_key: str | None = None):
+async def auth_callback(request: Request, request_token: str, api_secret: str | None = None, api_key: str | None = None):
     # Exchange request_token for access_token
-    key = api_key or os.environ.get("KITE_API_KEY")
+    key = api_key or request.cookies.get("kite_api_key") or os.environ.get("KITE_API_KEY")
     if not key:
         return JSONResponse({"error": "Missing api_key. Pass ?api_key=... or set KITE_API_KEY"}, status_code=400)
     # Prefer provided api_secret, else read from env
-    secret = api_secret or os.environ.get("KITE_API_SECRET")
+    secret = api_secret or request.cookies.get("kite_api_secret") or os.environ.get("KITE_API_SECRET")
     if not secret:
         return JSONResponse({"error": "KITE_API_SECRET not provided or set"}, status_code=400)
     access_token = KiteService.exchange_request_token(api_key=key, api_secret=secret, request_token=request_token)
@@ -72,6 +72,22 @@ async def auth_callback(request_token: str, api_secret: str | None = None, api_k
     except Exception:
         pass
     return {"access_token": access_token, "saved_to": token_path}
+
+
+@app.post("/ui/login")
+async def ui_login(request: Request, api_key: str = Form(...), api_secret: str = Form(...)):
+    # Set short-lived cookies with api_key and api_secret, then redirect to Kite login URL
+    try:
+        url = KiteService.login_url_from_env(api_key_override=api_key)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+    response = RedirectResponse(url)
+    # Short-lived cookies (10 minutes)
+    max_age = 10 * 60
+    response.set_cookie("kite_api_key", api_key, max_age=max_age, httponly=True, secure=True, samesite="lax")
+    response.set_cookie("kite_api_secret", api_secret, max_age=max_age, httponly=True, secure=True, samesite="lax")
+    return response
 
 
 @app.get("/", response_class=HTMLResponse)

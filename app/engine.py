@@ -261,14 +261,42 @@ def compute_equity_and_stats(df: pd.DataFrame) -> Tuple[List[float], Dict[str, f
     avg_win = sum(wins) / len(wins) if wins else 0.0
     avg_loss = sum(losses) / len(losses) if losses else 0.0
     rr = (avg_win / abs(avg_loss)) if avg_loss < 0 else 0.0
+    # Expectancy per trade (average return per trade)
+    expectancy = (sum(returns) / len(returns)) if returns else 0.0
+
+    # CAGR and Calmar Ratio
+    cagr_pct = 0.0
+    try:
+        if not df.empty and equity:
+            start_dates = pd.to_datetime(df.get("Entry Date"), errors="coerce")
+            end_dates = pd.to_datetime(df.get("Exit Date"), errors="coerce")
+            start_dt = start_dates.min()
+            end_dt = end_dates.max()
+            if pd.notna(start_dt) and pd.notna(end_dt) and end_dt > start_dt:
+                days = (end_dt - start_dt).days
+                years = max(days / 365.25, 1e-6)
+                ending = equity[-1] / 100.0
+                if ending > 0:
+                    cagr_pct = ((ending) ** (1.0 / years) - 1.0) * 100.0
+    except Exception:
+        cagr_pct = 0.0
+
+    calmar = (cagr_pct / abs(max_dd)) if max_dd > 0 else 0.0
+    total_return_pct = ((equity[-1] / 100.0 - 1.0) * 100.0) if equity else 0.0
+    recovery_factor = (total_return_pct / abs(max_dd)) if max_dd > 0 else 0.0
+
     stats: Dict[str, float] = {
         "trades": float(len(returns)),
         "win_rate_pct": (len(wins) / len(returns) * 100.0) if returns else 0.0,
         "avg_win_pct": avg_win,
         "avg_loss_pct": avg_loss,
         "risk_reward": rr,
-        "total_return_pct": ((equity[-1] / 100.0 - 1.0) * 100.0) if equity else 0.0,
+        "total_return_pct": total_return_pct,
         "max_drawdown_pct": max_dd,
+        "expectancy_pct": expectancy,
+        "cagr_pct": cagr_pct,
+        "calmar_ratio": calmar,
+        "recovery_factor": recovery_factor,
     }
     return equity, stats
 

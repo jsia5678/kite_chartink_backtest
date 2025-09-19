@@ -244,18 +244,18 @@ def run_backtest_from_csv(
 
 def compute_equity_and_stats(df: pd.DataFrame) -> Tuple[List[float], Dict[str, float]]:
     returns = [float(x) for x in df.get("Return %", []) if pd.notna(x)]
-    equity: List[float] = []
-    value = 100.0
-    peak = value
-    max_dd = 0.0
-    for r in returns:
-        value *= (1.0 + r / 100.0)
-        equity.append(round(value, 4))
-        if value > peak:
-            peak = value
-        dd = (peak - value) / peak * 100.0 if peak > 0 else 0.0
-        if dd > max_dd:
-            max_dd = dd
+    # Vectorized equity curve
+    if returns:
+        import numpy as np
+        equity_arr = 100.0 * np.cumprod(1.0 + np.array(returns, dtype=float) / 100.0)
+        equity = [round(float(x), 4) for x in equity_arr]
+        # Drawdown
+        running_peak = np.maximum.accumulate(equity_arr)
+        dd_series = (running_peak - equity_arr) / running_peak * 100.0
+        max_dd = float(dd_series.max()) if dd_series.size else 0.0
+    else:
+        equity = []
+        max_dd = 0.0
     wins = [r for r in returns if r > 0]
     losses = [r for r in returns if r <= 0]
     avg_win = sum(wins) / len(wins) if wins else 0.0

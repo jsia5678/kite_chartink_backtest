@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime as dt
 import os
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Dict, Tuple
 import time
 import json
 
@@ -32,6 +32,8 @@ class KiteService:
         self.client = KiteConnect(api_key=api_key)
         self.client.set_access_token(access_token)
         self._instruments_cache: Optional[pd.DataFrame] = None
+        # Simple in-memory OHLC cache
+        self._ohlc_cache: Dict[Tuple[int, str, int, int], pd.DataFrame] = {}
 
     @classmethod
     def from_env(cls) -> "KiteService":
@@ -115,6 +117,11 @@ class KiteService:
 
         interval: "minute", "3minute", "5minute", "10minute", "15minute", "30minute", "60minute", "day"
         """
+        # Cache key (minute-level timestamps to constrain cache size)
+        key = (token, interval, int(start.timestamp() // 60), int(end.timestamp() // 60))
+        if key in self._ohlc_cache:
+            return self._ohlc_cache[key]
+
         # Respect rate limits with a simple retry strategy
         max_attempts = 3
         attempt = 0
@@ -146,7 +153,9 @@ class KiteService:
                 else:
                     raise
         if not records:
-            return pd.DataFrame()
+            df = pd.DataFrame()
+            self._ohlc_cache[key] = df
+            return df
         df = pd.DataFrame(records)
         # Kite returns datetimes in 'date' (tz-aware IST). Handle robustly.
         if "date" in df.columns:
@@ -162,7 +171,9 @@ class KiteService:
             idx = pd.date_range(start=start, end=end, freq=freq).tz_convert(tz)
         df.index = idx
         df = df.rename(columns={"open": "open", "high": "high", "low": "low", "close": "close"})
-        return df[["open", "high", "low", "close"]]
+        df = df[["open", "high", "low", "close"]]
+        self._ohlc_cache[key] = df
+        return df
 
     @staticmethod
     def login_url_from_env(api_key_override: Optional[str] = None) -> str:

@@ -47,9 +47,8 @@ async def backtest_endpoint(
     cap_mid: Optional[str] = Form(default=None),
     cap_large: Optional[str] = Form(default=None),
     cap_meta_csv: Optional[UploadFile] = File(default=None),
-    trail_activate_profit_pct: Optional[str] = Form(default=None),
-    trail_to_breakeven: Optional[str] = Form(default=None),
-    trail_gap_pct: Optional[str] = Form(default=None),
+    breakeven_profit_pct: Optional[str] = Form(default=None),
+    breakeven_at_sl: Optional[str] = Form(default=None),
 ):
     # Save uploaded file to a temp buffer and run backtest
     content = await file.read()
@@ -93,9 +92,8 @@ async def backtest_endpoint(
             allowed_entry_times=allowed or None,
             allowed_cap_buckets=cap_allowed or None,
             symbol_cap_csv_path=cap_meta_path,
-            trail_activate_profit_pct=_to_opt_float(trail_activate_profit_pct),
-            trail_to_breakeven=bool(trail_to_breakeven),
-            trail_gap_pct=_to_opt_float(trail_gap_pct),
+            breakeven_profit_pct=_to_opt_float(breakeven_profit_pct),
+            breakeven_at_sl=bool(breakeven_at_sl),
         )
         if output == "csv":
             csv_bytes = df.to_csv(index=False).encode("utf-8")
@@ -186,7 +184,7 @@ async def index(request: Request):
 
 
 @app.post("/ui/backtest", response_class=HTMLResponse)
-async def ui_backtest(request: Request, file: UploadFile = File(...), days: int = Form(...), exchange: str = Form("NSE"), tz: str = Form("Asia/Kolkata"), sl_pct: Optional[str] = Form(default=None), tp_pct: Optional[str] = Form(default=None), entry_time: Optional[str] = Form(default=None), entry_time2: Optional[str] = Form(default=None), entry_time3: Optional[str] = Form(default=None), cap_small: Optional[str] = Form(default=None), cap_mid: Optional[str] = Form(default=None), cap_large: Optional[str] = Form(default=None), cap_meta_csv: Optional[UploadFile] = File(default=None), trail_activate_profit_pct: Optional[str] = Form(default=None), trail_to_breakeven: Optional[str] = Form(default=None), trail_gap_pct: Optional[str] = Form(default=None)):
+async def ui_backtest(request: Request, file: UploadFile = File(...), days: int = Form(...), exchange: str = Form("NSE"), tz: str = Form("Asia/Kolkata"), sl_pct: Optional[str] = Form(default=None), tp_pct: Optional[str] = Form(default=None), entry_time: Optional[str] = Form(default=None), entry_time2: Optional[str] = Form(default=None), entry_time3: Optional[str] = Form(default=None), cap_small: Optional[str] = Form(default=None), cap_mid: Optional[str] = Form(default=None), cap_large: Optional[str] = Form(default=None), cap_meta_csv: Optional[UploadFile] = File(default=None), breakeven_profit_pct: Optional[str] = Form(default=None), breakeven_at_sl: Optional[str] = Form(default=None)):
     # Ensure required Kite credentials are available for engine via env
     try:
         cookie_api_key = (request.cookies.get("kite_api_key") or "").strip()
@@ -238,9 +236,8 @@ async def ui_backtest(request: Request, file: UploadFile = File(...), days: int 
             allowed_entry_times=allowed or None,
             allowed_cap_buckets=cap_allowed or None,
             symbol_cap_csv_path=cap_meta_path,
-            trail_activate_profit_pct=_to_opt_float(trail_activate_profit_pct),
-            trail_to_breakeven=bool(trail_to_breakeven),
-            trail_gap_pct=_to_opt_float(trail_gap_pct),
+            breakeven_profit_pct=_to_opt_float(breakeven_profit_pct),
+            breakeven_at_sl=bool(breakeven_at_sl),
         )
         records = df.to_dict(orient="records")
         equity, stats = compute_equity_and_stats(df)

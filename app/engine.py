@@ -20,9 +20,8 @@ def compute_entry_exit_for_row(
     tz: pytz.BaseTzInfo,
     sl_pct: Optional[float] = None,
     tp_pct: Optional[float] = None,
-    trail_activate_profit_pct: Optional[float] = None,
-    trail_to_breakeven: bool = False,
-    trail_gap_pct: Optional[float] = None,
+    breakeven_profit_pct: Optional[float] = None,
+    breakeven_at_sl: bool = False,
 ) -> dict:
     # Build localized entry timestamp
     entry_dt_local = tz.localize(dt.datetime.combine(row.entry_date, row.entry_time))
@@ -53,7 +52,7 @@ def compute_entry_exit_for_row(
     exit_time_str = "15:30"
 
     # If SL/TP provided, scan intraday candles from entry onward USING 5-MIN CLOSES
-    if (sl_pct is not None and sl_pct > 0) or (tp_pct is not None and tp_pct > 0) or trail_activate_profit_pct:
+    if (sl_pct is not None and sl_pct > 0) or (tp_pct is not None and tp_pct > 0) or (breakeven_profit_pct is not None) or breakeven_at_sl:
         target_price = entry_price * (1.0 + (tp_pct or 0.0) / 100.0) if tp_pct else None
         base_stop_price = entry_price * (1.0 - (sl_pct or 0.0) / 100.0) if sl_pct else None
         current_stop = base_stop_price
@@ -73,18 +72,17 @@ def compute_entry_exit_for_row(
                     exit_ts = ts
                     break
 
-                # 2) Trailing stop logic (activate after certain unrealized profit)
-                if trail_activate_profit_pct is not None:
-                    activate_price = entry_price * (1.0 + trail_activate_profit_pct / 100.0)
-                    if close_v >= activate_price:
-                        # Set breakeven first time we cross activation if requested
-                        if trail_to_breakeven and not breakeven_set:
-                            current_stop = max(current_stop or -1e18, entry_price)
-                            breakeven_set = True
-                        # Then trail with gap if provided (e.g., keep stop at highest_close * (1 - gap))
-                        if trail_gap_pct is not None and trail_gap_pct > 0:
-                            trailed = close_v * (1.0 - trail_gap_pct / 100.0)
-                            current_stop = max(current_stop or -1e18, trailed)
+                # 2) Breakeven logic: either fixed profit % or when profit >= SL%
+                activate_be = False
+                if breakeven_profit_pct is not None:
+                    if close_v >= entry_price * (1.0 + breakeven_profit_pct / 100.0):
+                        activate_be = True
+                if not activate_be and breakeven_at_sl and sl_pct is not None and sl_pct > 0:
+                    if close_v >= entry_price * (1.0 + sl_pct / 100.0):
+                        activate_be = True
+                if activate_be and not breakeven_set:
+                    current_stop = max(current_stop or -1e18, entry_price)
+                    breakeven_set = True
 
                 # 3) Baseline SL check (at close) using current_stop
                 if current_stop is not None and close_v <= current_stop:
@@ -139,9 +137,8 @@ def run_backtest_from_csv(
     allowed_entry_times: Optional[List[str]] | None = None,
     allowed_cap_buckets: Optional[List[str]] | None = None,
     symbol_cap_csv_path: Optional[str] | None = None,
-    trail_activate_profit_pct: Optional[float] | None = None,
-    trail_to_breakeven: bool = False,
-    trail_gap_pct: Optional[float] | None = None,
+    breakeven_profit_pct: Optional[float] | None = None,
+    breakeven_at_sl: bool = False,
 ) -> pd.DataFrame:
     tz = pytz.timezone(timezone_name)
     kite = KiteService.from_env()
@@ -163,9 +160,8 @@ def run_backtest_from_csv(
                     tz=tz,
                     sl_pct=sl_pct,
                     tp_pct=tp_pct,
-                    trail_activate_profit_pct=trail_activate_profit_pct,
-                    trail_to_breakeven=trail_to_breakeven,
-                    trail_gap_pct=trail_gap_pct,
+                    breakeven_profit_pct=breakeven_profit_pct,
+                    breakeven_at_sl=breakeven_at_sl,
                 )
             )
         except Exception as e:

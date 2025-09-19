@@ -83,16 +83,11 @@
           <label>TP % (optional)
             <input type="number" name="tp_pct" step="0.01" placeholder="e.g. 4.0" />
           </label>
-          <label>Trail activate at profit %
-            <input type="number" name="trail_activate_profit_pct" step="0.01" placeholder="e.g. 1.0" />
-          </label>
-        </div>
-        <div class="grid" style="grid-template-columns:repeat(3,1fr)">
-          <label>Trail gap %
-            <input type="number" name="trail_gap_pct" step="0.01" placeholder="e.g. 0.5" />
+          <label>Breakeven at profit %
+            <input type="number" name="breakeven_profit_pct" step="0.01" placeholder="e.g. 1.0" />
           </label>
           <label style="align-self:end">
-            <input type="checkbox" name="trail_to_breakeven" value="1" /> Move SL to breakeven when activated
+            <input type="checkbox" name="breakeven_at_sl" value="1" /> Breakeven when profit ≥ SL %
           </label>
           <div style="align-self:end"><button class="btn primary" type="submit">Re-run with selected times</button></div>
         </div>

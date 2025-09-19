@@ -66,6 +66,9 @@ async def auth_callback(request: Request, request_token: str, api_secret: str | 
         secret = api_secret or request.cookies.get("kite_api_secret") or os.environ.get("KITE_API_SECRET")
         if not secret:
             raise ValueError("KITE_API_SECRET not provided or set")
+        # Trim accidental whitespace
+        key = key.strip()
+        secret = secret.strip()
 
         access_token = KiteService.exchange_request_token(api_key=key, api_secret=secret, request_token=request_token)
         # Optionally persist to token file
@@ -100,8 +103,8 @@ async def ui_login(request: Request, api_key: str = Form(...), api_secret: str =
     response = RedirectResponse(url, status_code=303)
     # Short-lived cookies (10 minutes)
     max_age = 10 * 60
-    response.set_cookie("kite_api_key", api_key, max_age=max_age, httponly=True, secure=True, samesite="lax")
-    response.set_cookie("kite_api_secret", api_secret, max_age=max_age, httponly=True, secure=True, samesite="lax")
+    response.set_cookie("kite_api_key", api_key.strip(), max_age=max_age, httponly=True, secure=True, samesite="lax")
+    response.set_cookie("kite_api_secret", api_secret.strip(), max_age=max_age, httponly=True, secure=True, samesite="lax")
     return response
 
 

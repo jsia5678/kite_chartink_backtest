@@ -57,32 +57,36 @@ async def login_url(api_key: str | None = None):
 
 @app.get("/auth/callback")
 async def auth_callback(request: Request, request_token: str, api_secret: str | None = None, api_key: str | None = None, format: str | None = None):
-    # Exchange request_token for access_token
-    key = api_key or request.cookies.get("kite_api_key") or os.environ.get("KITE_API_KEY")
-    if not key:
-        return JSONResponse({"error": "Missing api_key. Pass ?api_key=... or set KITE_API_KEY"}, status_code=400)
-    # Prefer provided api_secret, else read from env
-    secret = api_secret or request.cookies.get("kite_api_secret") or os.environ.get("KITE_API_SECRET")
-    if not secret:
-        return JSONResponse({"error": "KITE_API_SECRET not provided or set"}, status_code=400)
-    access_token = KiteService.exchange_request_token(api_key=key, api_secret=secret, request_token=request_token)
-    # Optionally persist to token file
-    token_path = os.environ.get("KITE_TOKEN_PATH", "/tmp/kite_token.json")
     try:
-        with open(token_path, "w", encoding="utf-8") as f:
-            f.write('{"access_token": "' + access_token + '"}')
-    except Exception:
-        pass
+        # Exchange request_token for access_token
+        key = api_key or request.cookies.get("kite_api_key") or os.environ.get("KITE_API_KEY")
+        if not key:
+            raise ValueError("Missing api_key. Pass ?api_key=... or set KITE_API_KEY")
+        # Prefer provided api_secret, else read from env
+        secret = api_secret or request.cookies.get("kite_api_secret") or os.environ.get("KITE_API_SECRET")
+        if not secret:
+            raise ValueError("KITE_API_SECRET not provided or set")
 
-    # If JSON requested explicitly, return JSON; otherwise redirect to home with banner
-    accepts = (request.headers.get("accept") or "").lower()
-    if format == "json" or "application/json" in accepts:
-        return {"access_token": access_token, "saved_to": token_path}
+        access_token = KiteService.exchange_request_token(api_key=key, api_secret=secret, request_token=request_token)
+        # Optionally persist to token file
+        token_path = os.environ.get("KITE_TOKEN_PATH", "/tmp/kite_token.json")
+        try:
+            with open(token_path, "w", encoding="utf-8") as f:
+                f.write('{"access_token": "' + access_token + '"}')
+        except Exception:
+            pass
 
-    resp = RedirectResponse(url="/?authed=1", status_code=303)
-    # Optional cookie for UX; server reads token file/env, not this cookie
-    resp.set_cookie("kite_access_token", access_token, max_age=12 * 60 * 60, httponly=True, secure=True, samesite="lax")
-    return resp
+        # If JSON requested explicitly, return JSON; otherwise redirect to home with banner
+        accepts = (request.headers.get("accept") or "").lower()
+        if format == "json" or "application/json" in accepts:
+            return {"access_token": access_token, "saved_to": token_path}
+
+        resp = RedirectResponse(url="/?authed=1", status_code=303)
+        # Optional cookie for UX; server reads token file/env, not this cookie
+        resp.set_cookie("kite_access_token", access_token, max_age=12 * 60 * 60, httponly=True, secure=True, samesite="lax")
+        return resp
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
 
 
 @app.post("/ui/login")

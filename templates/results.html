@@ -27,8 +27,54 @@
       </section>
       {% endif %}
       {% if insights and insights.top_entry_times %}
-      <div class="card raise">
+      <form action="/ui/backtest" method="post" enctype="multipart/form-data" class="card raise">
         <h2>Best entry times (TP hit rate)</h2>
+        <p class="sub" style="margin-bottom:8px">Pick up to 3 entry times and re-run backtest on them (upload CSV again).</p>
+        <div class="grid" style="grid-template-columns:repeat(6,1fr)">
+          <label>Entry time 1
+            <select name="entry_time">
+              <option value="">--</option>
+              {% for t in insights.top_entry_times %}
+              <option value="{{ t.time }}">{{ t.time }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>Entry time 2
+            <select name="entry_time2">
+              <option value="">--</option>
+              {% for t in insights.top_entry_times %}
+              <option value="{{ t.time }}">{{ t.time }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>Entry time 3
+            <select name="entry_time3">
+              <option value="">--</option>
+              {% for t in insights.top_entry_times %}
+              <option value="{{ t.time }}">{{ t.time }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>CSV file
+            <input type="file" name="file" accept=".csv" required />
+          </label>
+          <label>Days (N)
+            <input type="number" name="days" value="{{ default_days or 5 }}" min="1" required />
+          </label>
+          <label>Timezone
+            <input type="text" name="tz" value="{{ default_tz or 'Asia/Kolkata' }}" />
+          </label>
+        </div>
+        <input type="hidden" name="exchange" value="{{ default_exchange or 'NSE' }}" />
+        <div class="grid" style="grid-template-columns:repeat(3,1fr)">
+          <label>SL % (optional)
+            <input type="number" name="sl_pct" step="0.01" placeholder="e.g. 2.0" />
+          </label>
+          <label>TP % (optional)
+            <input type="number" name="tp_pct" step="0.01" placeholder="e.g. 4.0" />
+          </label>
+          <div style="align-self:end"><button class="btn primary" type="submit">Re-run with selected times</button></div>
+        </div>
         <div class="table-wrap"><table>
           <thead><tr><th>Entry Time</th><th>Trades</th><th>TP hits</th><th>TP hit %</th><th>Avg Return %</th></tr></thead>
           <tbody>
@@ -39,7 +85,7 @@
             {% endfor %}
           </tbody>
         </table></div>
-      </div>
+      </form>
       {% endif %}
       {% if insights and insights.cap_performance %}
       <div class="card raise">

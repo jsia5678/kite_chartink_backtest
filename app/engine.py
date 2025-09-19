@@ -119,11 +119,16 @@ def run_backtest_from_csv(
     timezone_name: str,
     sl_pct: Optional[float] | None = None,
     tp_pct: Optional[float] | None = None,
+    allowed_entry_times: Optional[List[str]] | None = None,
 ) -> pd.DataFrame:
     tz = pytz.timezone(timezone_name)
     kite = KiteService.from_env()
 
     rows = parse_chartink_csv(csv_path=csv_path, tz=tz)
+    # Optional filter by allowed entry times (strings HH:MM)
+    if allowed_entry_times:
+        allowed_set = {t.strip() for t in allowed_entry_times if t}
+        rows = [r for r in rows if r.entry_time.strftime("%H:%M") in allowed_set]
     results = []
     for r in rows:
         try:

@@ -11,6 +11,7 @@ from .utils import parse_chartink_csv, nearest_prior_timestamp, trading_days_ahe
 from .types import BacktestInputRow
 
 
+
 def compute_entry_exit_for_row(
     kite: KiteService,
     row: BacktestInputRow,
@@ -48,32 +49,28 @@ def compute_entry_exit_for_row(
     exit_price: Optional[float] = None
     exit_time_str = "15:30"
 
-    # If SL/TP provided, scan intraday candles from entry onward
+    # If SL/TP provided, scan intraday candles from entry onward USING 5-MIN CLOSES
     if (sl_pct is not None and sl_pct > 0) or (tp_pct is not None and tp_pct > 0):
         target_price = entry_price * (1.0 + (tp_pct or 0.0) / 100.0)
         stop_price = entry_price * (1.0 - (sl_pct or 0.0) / 100.0)
         scan_start = entry_ts
         scan_end = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(15, 30)))
-        intraday = kite.fetch_ohlc(token=token, interval="15minute", start=scan_start, end=scan_end, tz=tz)
+        # Use 5-minute resolution and evaluate on candle CLOSES for accuracy
+        intraday = kite.fetch_ohlc(token=token, interval="5minute", start=scan_start, end=scan_end, tz=tz)
         if not intraday.empty:
+            # Consider candles strictly after entry timestamp
             intraday = intraday[intraday.index > entry_ts]
             for ts, row_c in intraday.iterrows():
-                high_v = float(row_c.get("high", row_c.get("close", 0.0)))
-                low_v = float(row_c.get("low", row_c.get("close", 0.0)))
-                # If both touched in same bar, assume SL first (conservative)
-                if (tp_pct and target_price <= high_v) and (sl_pct and stop_price >= low_v):
-                    exit_reason = "SL"
-                    exit_price = stop_price
-                    exit_ts = ts
-                    break
-                if tp_pct and target_price <= high_v:
+                close_v = float(row_c.get("close", row_c.get("ohlc", {}).get("close", 0.0)))  # type: ignore
+                # Exit on close at or beyond thresholds; take the candle close as exit price
+                if tp_pct and close_v >= target_price:
                     exit_reason = "TP"
-                    exit_price = target_price
+                    exit_price = close_v
                     exit_ts = ts
                     break
-                if sl_pct and stop_price >= low_v:
+                if sl_pct and close_v <= stop_price:
                     exit_reason = "SL"
-                    exit_price = stop_price
+                    exit_price = close_v
                     exit_ts = ts
                     break
 
@@ -110,6 +107,7 @@ def compute_entry_exit_for_row(
         "Return %": round(ret_pct, 4),
         "Exit Reason": exit_reason,
     }
+
 
 
 def run_backtest_from_csv(
@@ -221,6 +219,7 @@ def run_backtest_from_csv(
     return df[preferred + remaining]
 
 
+
 def compute_equity_and_stats(df: pd.DataFrame) -> Tuple[List[float], Dict[str, float]]:
     returns = [float(x) for x in df.get("Return %", []) if pd.notna(x)]
     equity: List[float] = []
@@ -250,6 +249,7 @@ def compute_equity_and_stats(df: pd.DataFrame) -> Tuple[List[float], Dict[str, f
         "max_drawdown_pct": max_dd,
     }
     return equity, stats
+
 
 
 def compute_insights(df: pd.DataFrame) -> Dict[str, list]:

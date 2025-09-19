@@ -273,11 +273,16 @@ def compute_equity_and_stats(df: pd.DataFrame) -> Tuple[List[float], Dict[str, f
             start_dt = start_dates.min()
             end_dt = end_dates.max()
             if pd.notna(start_dt) and pd.notna(end_dt) and end_dt > start_dt:
-                days = (end_dt - start_dt).days
-                years = max(days / 365.25, 1e-6)
+                days = max((end_dt - start_dt).days, 1)
+                years = days / 365.25
                 ending = equity[-1] / 100.0
                 if ending > 0:
-                    cagr_pct = ((ending) ** (1.0 / years) - 1.0) * 100.0
+                    if years >= 0.25:
+                        # Use geometric annualization only for reasonably long periods
+                        cagr_pct = ((ending) ** (365.25 / days) - 1.0) * 100.0
+                    else:
+                        # For short windows, report period return as "CAGR" proxy to avoid blow-ups
+                        cagr_pct = (ending - 1.0) * 100.0
     except Exception:
         cagr_pct = 0.0
 

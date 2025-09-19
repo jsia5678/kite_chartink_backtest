@@ -43,6 +43,15 @@
             <label>TP % (optional)
               <input type="number" name="tp_pct" step="0.01" placeholder="e.g. 4.0" />
             </label>
+            <label>Trail activate at profit %
+              <input type="number" name="trail_activate_profit_pct" step="0.01" placeholder="e.g. 1.0" />
+            </label>
+            <label>Trail gap %
+              <input type="number" name="trail_gap_pct" step="0.01" placeholder="e.g. 0.5" />
+            </label>
+            <label style="align-self:end">
+              <input type="checkbox" name="trail_to_breakeven" value="1" /> Move SL to breakeven when activated
+            </label>
           </div>
           <div class="hint">Tip: SL/TP uses 15 minute candles to detect early exits.</div>
           <button class="btn primary" type="submit">Run backtest</button>

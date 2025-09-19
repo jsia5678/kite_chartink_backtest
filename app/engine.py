@@ -20,6 +20,9 @@ def compute_entry_exit_for_row(
     tz: pytz.BaseTzInfo,
     sl_pct: Optional[float] = None,
     tp_pct: Optional[float] = None,
+    trail_activate_profit_pct: Optional[float] = None,
+    trail_to_breakeven: bool = False,
+    trail_gap_pct: Optional[float] = None,
 ) -> dict:
     # Build localized entry timestamp
     entry_dt_local = tz.localize(dt.datetime.combine(row.entry_date, row.entry_time))
@@ -50,25 +53,41 @@ def compute_entry_exit_for_row(
     exit_time_str = "15:30"
 
     # If SL/TP provided, scan intraday candles from entry onward USING 5-MIN CLOSES
-    if (sl_pct is not None and sl_pct > 0) or (tp_pct is not None and tp_pct > 0):
-        target_price = entry_price * (1.0 + (tp_pct or 0.0) / 100.0)
-        stop_price = entry_price * (1.0 - (sl_pct or 0.0) / 100.0)
+    if (sl_pct is not None and sl_pct > 0) or (tp_pct is not None and tp_pct > 0) or trail_activate_profit_pct:
+        target_price = entry_price * (1.0 + (tp_pct or 0.0) / 100.0) if tp_pct else None
+        base_stop_price = entry_price * (1.0 - (sl_pct or 0.0) / 100.0) if sl_pct else None
+        current_stop = base_stop_price
+        breakeven_set = False
+
         scan_start = entry_ts
         scan_end = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(15, 30)))
-        # Use 5-minute resolution and evaluate on candle CLOSES for accuracy
         intraday = kite.fetch_ohlc(token=token, interval="5minute", start=scan_start, end=scan_end, tz=tz)
         if not intraday.empty:
-            # Consider candles strictly after entry timestamp
             intraday = intraday[intraday.index > entry_ts]
             for ts, row_c in intraday.iterrows():
                 close_v = float(row_c.get("close", row_c.get("ohlc", {}).get("close", 0.0)))  # type: ignore
-                # Exit on close at or beyond thresholds; take the candle close as exit price
-                if tp_pct and close_v >= target_price:
+                # 1) TP check (at close)
+                if target_price is not None and close_v >= target_price:
                     exit_reason = "TP"
                     exit_price = close_v
                     exit_ts = ts
                     break
-                if sl_pct and close_v <= stop_price:
+
+                # 2) Trailing stop logic (activate after certain unrealized profit)
+                if trail_activate_profit_pct is not None:
+                    activate_price = entry_price * (1.0 + trail_activate_profit_pct / 100.0)
+                    if close_v >= activate_price:
+                        # Set breakeven first time we cross activation if requested
+                        if trail_to_breakeven and not breakeven_set:
+                            current_stop = max(current_stop or -1e18, entry_price)
+                            breakeven_set = True
+                        # Then trail with gap if provided (e.g., keep stop at highest_close * (1 - gap))
+                        if trail_gap_pct is not None and trail_gap_pct > 0:
+                            trailed = close_v * (1.0 - trail_gap_pct / 100.0)
+                            current_stop = max(current_stop or -1e18, trailed)
+
+                # 3) Baseline SL check (at close) using current_stop
+                if current_stop is not None and close_v <= current_stop:
                     exit_reason = "SL"
                     exit_price = close_v
                     exit_ts = ts
@@ -120,6 +139,9 @@ def run_backtest_from_csv(
     allowed_entry_times: Optional[List[str]] | None = None,
     allowed_cap_buckets: Optional[List[str]] | None = None,
     symbol_cap_csv_path: Optional[str] | None = None,
+    trail_activate_profit_pct: Optional[float] | None = None,
+    trail_to_breakeven: bool = False,
+    trail_gap_pct: Optional[float] | None = None,
 ) -> pd.DataFrame:
     tz = pytz.timezone(timezone_name)
     kite = KiteService.from_env()
@@ -141,6 +163,9 @@ def run_backtest_from_csv(
                     tz=tz,
                     sl_pct=sl_pct,
                     tp_pct=tp_pct,
+                    trail_activate_profit_pct=trail_activate_profit_pct,
+                    trail_to_breakeven=trail_to_breakeven,
+                    trail_gap_pct=trail_gap_pct,
                 )
             )
         except Exception as e:
@@ -194,6 +219,7 @@ def run_backtest_from_csv(
                 return "Small"
             if mc <= q2:
                 return "Mid"
+                
             return "Large"
         df["Cap Bucket"] = cap_series.apply(lambda mc: cap_bucket(mc) if pd.notna(mc) else None)
     elif "Entry Price" in df.columns:

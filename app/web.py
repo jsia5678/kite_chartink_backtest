@@ -20,14 +20,26 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 @app.post("/backtest")
+def _to_opt_float(val: Optional[str]) -> Optional[float]:
+    try:
+        if val is None:
+            return None
+        s = str(val).strip()
+        if s == "":
+            return None
+        return float(s)
+    except Exception:
+        return None
+
+
 async def backtest_endpoint(
     file: UploadFile = File(...),
     days: int = Form(...),
     exchange: str = Form(default=os.environ.get("EXCHANGE", "NSE")),
     tz: str = Form(default=os.environ.get("MARKET_TZ", "Asia/Kolkata")),
     output: str = Form(default="json"),
-    sl_pct: Optional[float] = Form(default=None),
-    tp_pct: Optional[float] = Form(default=None),
+    sl_pct: Optional[str] = Form(default=None),
+    tp_pct: Optional[str] = Form(default=None),
     entry_time: Optional[str] = Form(default=None),
     entry_time2: Optional[str] = Form(default=None),
     entry_time3: Optional[str] = Form(default=None),
@@ -42,7 +54,15 @@ async def backtest_endpoint(
 
     try:
         allowed = [t for t in [entry_time, entry_time2, entry_time3] if t]
-        df = run_backtest_from_csv(csv_path=tmp_path, num_days=days, exchange=exchange, timezone_name=tz, sl_pct=sl_pct, tp_pct=tp_pct, allowed_entry_times=allowed or None)
+        df = run_backtest_from_csv(
+            csv_path=tmp_path,
+            num_days=days,
+            exchange=exchange,
+            timezone_name=tz,
+            sl_pct=_to_opt_float(sl_pct),
+            tp_pct=_to_opt_float(tp_pct),
+            allowed_entry_times=allowed or None,
+        )
         if output == "csv":
             csv_bytes = df.to_csv(index=False).encode("utf-8")
             return StreamingResponse(io.BytesIO(csv_bytes), media_type="text/csv")
@@ -132,7 +152,7 @@ async def index(request: Request):
 
 
 @app.post("/ui/backtest", response_class=HTMLResponse)
-async def ui_backtest(request: Request, file: UploadFile = File(...), days: int = Form(...), exchange: str = Form("NSE"), tz: str = Form("Asia/Kolkata"), sl_pct: Optional[float] = Form(default=None), tp_pct: Optional[float] = Form(default=None), entry_time: Optional[str] = Form(default=None), entry_time2: Optional[str] = Form(default=None), entry_time3: Optional[str] = Form(default=None)):
+async def ui_backtest(request: Request, file: UploadFile = File(...), days: int = Form(...), exchange: str = Form("NSE"), tz: str = Form("Asia/Kolkata"), sl_pct: Optional[str] = Form(default=None), tp_pct: Optional[str] = Form(default=None), entry_time: Optional[str] = Form(default=None), entry_time2: Optional[str] = Form(default=None), entry_time3: Optional[str] = Form(default=None)):
     # Ensure required Kite credentials are available for engine via env
     try:
         cookie_api_key = (request.cookies.get("kite_api_key") or "").strip()
@@ -153,7 +173,15 @@ async def ui_backtest(request: Request, file: UploadFile = File(...), days: int 
 
     try:
         allowed = [t for t in [entry_time, entry_time2, entry_time3] if t]
-        df = run_backtest_from_csv(csv_path=tmp_path, num_days=days, exchange=exchange, timezone_name=tz, sl_pct=sl_pct, tp_pct=tp_pct, allowed_entry_times=allowed or None)
+        df = run_backtest_from_csv(
+            csv_path=tmp_path,
+            num_days=days,
+            exchange=exchange,
+            timezone_name=tz,
+            sl_pct=_to_opt_float(sl_pct),
+            tp_pct=_to_opt_float(tp_pct),
+            allowed_entry_times=allowed or None,
+        )
         records = df.to_dict(orient="records")
         equity, stats = compute_equity_and_stats(df)
         insights = compute_insights(df)

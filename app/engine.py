@@ -299,7 +299,6 @@ def compute_equity_and_stats(df: pd.DataFrame) -> Tuple[List[float], Dict[str, f
         "total_return_pct": total_return_pct,
         "max_drawdown_pct": max_dd,
         "expectancy_pct": expectancy,
-        "cagr_pct": cagr_pct,
         "calmar_ratio": calmar,
         "recovery_factor": recovery_factor,
     }

@@ -25,8 +25,7 @@
         <div class="metric"><div class="k">Avg loss</div><div class="v">{{ '%.2f'|format(stats['avg_loss_pct']) }}%</div></div>
         <div class="metric"><div class="k">R:R</div><div class="v">{{ '%.2f'|format(stats['risk_reward']) }}</div></div>
         <div class="metric"><div class="k">Expectancy / trade</div><div class="v">{{ '%.2f'|format(stats['expectancy_pct']) }}%</div></div>
-        <div class="metric"><div class="k">CAGR</div><div class="v">{{ '%.2f'|format(stats['cagr_pct']) }}%</div></div>
-        <div class="metric"><div class="k">Calmar (CAGR / Max DD)</div><div class="v">{{ '%.2f'|format(stats['calmar_ratio']) }}</div></div>
+        <div class="metric"><div class="k">Calmar (Return / Max DD)</div><div class="v">{{ '%.2f'|format(stats['calmar_ratio']) }}</div></div>
         <div class="metric"><div class="k">Recovery factor</div><div class="v">{{ '%.2f'|format(stats['recovery_factor']) }}</div></div>
       </section>
       {% endif %}

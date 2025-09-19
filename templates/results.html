@@ -9,6 +9,17 @@
   <body>
     <main class="container">
       <h1>Results ({{ count }})</h1>
+      {% if stats %}
+      <section class="metrics">
+        <div class="metric"><div class="k">Trades</div><div class="v">{{ '%.0f'|format(stats['trades']) }}</div></div>
+        <div class="metric"><div class="k">Win rate</div><div class="v">{{ '%.2f'|format(stats['win_rate_pct']) }}%</div></div>
+        <div class="metric"><div class="k">Total return</div><div class="v">{{ '%.2f'|format(stats['total_return_pct']) }}%</div></div>
+        <div class="metric"><div class="k">Max DD</div><div class="v">{{ '%.2f'|format(stats['max_drawdown_pct']) }}%</div></div>
+        <div class="metric"><div class="k">Avg win</div><div class="v">{{ '%.2f'|format(stats['avg_win_pct']) }}%</div></div>
+        <div class="metric"><div class="k">Avg loss</div><div class="v">{{ '%.2f'|format(stats['avg_loss_pct']) }}%</div></div>
+        <div class="metric"><div class="k">R:R</div><div class="v">{{ '%.2f'|format(stats['risk_reward']) }}</div></div>
+      </section>
+      {% endif %}
       {% if error %}
       <div class="banner" style="background:#3a0f0f;border-color:#7f1d1d;color:#fecaca">Error: {{ error }}</div>
       {% endif %}
@@ -23,6 +34,7 @@
               <th>Exit Date</th>
               <th>Exit Time</th>
               <th>Exit Price</th>
+              <th>Exit Reason</th>
               <th>Return %</th>
               <th>Error</th>
             </tr>
@@ -37,6 +49,7 @@
               <td>{{ row["Exit Date"] }}</td>
               <td>{{ row.get("Exit Time", "") }}</td>
               <td>{{ row["Exit Price"] }}</td>
+              <td>{{ row.get("Exit Reason", "") }}</td>
               <td>{{ row["Return %"] }}</td>
               <td>{{ row.get("Error", "") }}</td>
             </tr>

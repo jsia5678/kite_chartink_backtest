@@ -26,6 +26,12 @@
           <label>Timezone
             <input type="text" name="tz" value="{{ default_tz }}" />
           </label>
+          <label>SL % (optional)
+            <input type="number" name="sl_pct" step="0.01" placeholder="e.g. 2.0" />
+          </label>
+          <label>TP % (optional)
+            <input type="number" name="tp_pct" step="0.01" placeholder="e.g. 4.0" />
+          </label>
         </div>
         <button type="submit">Run backtest</button>
       </form>

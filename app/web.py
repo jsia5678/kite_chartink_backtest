@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse, StreamingResponse, HTMLResponse, Red
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 
-from .engine import run_backtest_from_csv
+from .engine import run_backtest_from_csv, compute_equity_and_stats
 from .kite_service import KiteService
 
 app = FastAPI(title="Kite Chartink Backtester")
@@ -26,6 +26,8 @@ async def backtest_endpoint(
     exchange: str = Form(default=os.environ.get("EXCHANGE", "NSE")),
     tz: str = Form(default=os.environ.get("MARKET_TZ", "Asia/Kolkata")),
     output: str = Form(default="json"),
+    sl_pct: Optional[float] = Form(default=None),
+    tp_pct: Optional[float] = Form(default=None),
 ):
     # Save uploaded file to a temp buffer and run backtest
     content = await file.read()
@@ -36,7 +38,7 @@ async def backtest_endpoint(
         f.write(content)
 
     try:
-        df = run_backtest_from_csv(csv_path=tmp_path, num_days=days, exchange=exchange, timezone_name=tz)
+        df = run_backtest_from_csv(csv_path=tmp_path, num_days=days, exchange=exchange, timezone_name=tz, sl_pct=sl_pct, tp_pct=tp_pct)
         if output == "csv":
             csv_bytes = df.to_csv(index=False).encode("utf-8")
             return StreamingResponse(io.BytesIO(csv_bytes), media_type="text/csv")
@@ -126,7 +128,7 @@ async def index(request: Request):
 
 
 @app.post("/ui/backtest", response_class=HTMLResponse)
-async def ui_backtest(request: Request, file: UploadFile = File(...), days: int = Form(...), exchange: str = Form("NSE"), tz: str = Form("Asia/Kolkata")):
+async def ui_backtest(request: Request, file: UploadFile = File(...), days: int = Form(...), exchange: str = Form("NSE"), tz: str = Form("Asia/Kolkata"), sl_pct: Optional[float] = Form(default=None), tp_pct: Optional[float] = Form(default=None)):
     # Ensure required Kite credentials are available for engine via env
     try:
         cookie_api_key = (request.cookies.get("kite_api_key") or "").strip()
@@ -146,11 +148,12 @@ async def ui_backtest(request: Request, file: UploadFile = File(...), days: int 
         f.write(content)
 
     try:
-        df = run_backtest_from_csv(csv_path=tmp_path, num_days=days, exchange=exchange, timezone_name=tz)
+        df = run_backtest_from_csv(csv_path=tmp_path, num_days=days, exchange=exchange, timezone_name=tz, sl_pct=sl_pct, tp_pct=tp_pct)
         records = df.to_dict(orient="records")
+        equity, stats = compute_equity_and_stats(df)
         return templates.TemplateResponse(
             "results.html",
-            {"request": request, "rows": records, "count": len(records)},
+            {"request": request, "rows": records, "count": len(records), "stats": stats, "equity": equity},
         )
     except Exception as e:
         # Show error on the results page instead of 500

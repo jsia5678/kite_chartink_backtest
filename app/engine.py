@@ -146,8 +146,10 @@ def run_backtest_from_csv(
                     "Entry Time": r.entry_time.strftime("%H:%M"),
                     "Entry Price": None,
                     "Exit Date": None,
+                    "Exit Time": None,
                     "Exit Price": None,
                     "Return %": None,
+                    "Exit Reason": None,
                     "Error": str(e),
                 }
             )

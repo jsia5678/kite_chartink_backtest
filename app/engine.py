@@ -287,7 +287,10 @@ def compute_equity_and_stats(df: pd.DataFrame) -> Tuple[List[float], Dict[str, f
         cagr_pct = 0.0
 
     calmar = (cagr_pct / abs(max_dd)) if max_dd > 0 else 0.0
-    total_return_pct = ((equity[-1] / 100.0 - 1.0) * 100.0) if equity else 0.0
+    # Returns (both styles)
+    compounded_return_pct = ((equity[-1] / 100.0 - 1.0) * 100.0) if equity else 0.0
+    simple_return_pct = sum(returns) if returns else 0.0
+    total_return_pct = compounded_return_pct  # backward compatibility
     recovery_factor = (total_return_pct / abs(max_dd)) if max_dd > 0 else 0.0
 
     stats: Dict[str, float] = {
@@ -297,6 +300,8 @@ def compute_equity_and_stats(df: pd.DataFrame) -> Tuple[List[float], Dict[str, f
         "avg_loss_pct": avg_loss,
         "risk_reward": rr,
         "total_return_pct": total_return_pct,
+        "compounded_return_pct": compounded_return_pct,
+        "simple_return_pct": simple_return_pct,
         "max_drawdown_pct": max_dd,
         "expectancy_pct": expectancy,
         "calmar_ratio": calmar,

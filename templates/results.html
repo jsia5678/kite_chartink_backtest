@@ -19,7 +19,8 @@
       <section class="metrics">
         <div class="metric"><div class="k">Trades</div><div class="v">{{ '%.0f'|format(stats['trades']) }}</div></div>
         <div class="metric"><div class="k">Win rate</div><div class="v">{{ '%.2f'|format(stats['win_rate_pct']) }}%</div></div>
-        <div class="metric"><div class="k">Total return</div><div class="v">{{ '%.2f'|format(stats['total_return_pct']) }}%</div></div>
+        <div class="metric"><div class="k">Compounded return</div><div class="v">{{ '%.2f'|format(stats.get('compounded_return_pct', stats['total_return_pct'])) }}%</div></div>
+        <div class="metric"><div class="k">Simple return</div><div class="v">{{ '%.2f'|format(stats.get('simple_return_pct', 0.0)) }}%</div></div>
         <div class="metric"><div class="k">Max DD</div><div class="v">{{ '%.2f'|format(stats['max_drawdown_pct']) }}%</div></div>
         <div class="metric"><div class="k">Avg win</div><div class="v">{{ '%.2f'|format(stats['avg_win_pct']) }}%</div></div>
         <div class="metric"><div class="k">Avg loss</div><div class="v">{{ '%.2f'|format(stats['avg_loss_pct']) }}%</div></div>

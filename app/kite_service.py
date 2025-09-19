@@ -120,10 +120,16 @@ class KiteService:
         attempt = 0
         while True:
             try:
+                # Kite expects naive datetimes in IST or date objects; avoid tz-aware UTC here
+                ist = pytz.timezone("Asia/Kolkata")
+                start_naive = start.astimezone(ist).replace(tzinfo=None)
+                end_naive = end.astimezone(ist).replace(tzinfo=None)
+                if end_naive <= start_naive:
+                    end_naive = start_naive + dt.timedelta(minutes=1)
                 records = self.client.historical_data(
                     instrument_token=token,
-                    from_date=start.astimezone(pytz.UTC),
-                    to_date=end.astimezone(pytz.UTC),
+                    from_date=start_naive,
+                    to_date=end_naive,
                     interval=interval,
                     continuous=False,
                     oi=False,

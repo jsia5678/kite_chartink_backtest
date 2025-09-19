@@ -7,49 +7,72 @@
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
+    <header class="site-header">
+      <div class="container header-inner">
+        <div class="brand"><div class="logo-dot"></div><span>Kite Chartink Backtester</span></div>
+        <nav class="header-actions"><a class="btn secondary" href="#howto">How it works</a></nav>
+      </div>
+    </header>
     <main class="container">
-      <h1>Kite Chartink Backtester</h1>
+      <section class="hero">
+        <h1>Run lightning-fast backtests on real Kite data</h1>
+        <p class="sub">Upload a Chartink CSV, set parameters, and get analytics with optional SL/TP exits.</p>
+      </section>
       {% if request.query_params.get('authed') == '1' %}
       <div class="banner">Kite authentication successful. You can run your backtest now.</div>
       {% endif %}
-      <form action="/ui/backtest" method="post" enctype="multipart/form-data" class="card">
-        <label>CSV file
-          <input type="file" name="file" accept=".csv" required />
-        </label>
-        <div class="grid">
-          <label>Days (N)
-            <input type="number" name="days" value="{{ default_days }}" min="1" required />
+      <div class="grid-2">
+        <form action="/ui/backtest" method="post" enctype="multipart/form-data" class="card raise">
+          <h2>Backtest</h2>
+          <label>CSV file
+            <input type="file" name="file" accept=".csv" required />
           </label>
-          <label>Exchange
-            <input type="text" name="exchange" value="{{ default_exchange }}" />
-          </label>
-          <label>Timezone
-            <input type="text" name="tz" value="{{ default_tz }}" />
-          </label>
-          <label>SL % (optional)
-            <input type="number" name="sl_pct" step="0.01" placeholder="e.g. 2.0" />
-          </label>
-          <label>TP % (optional)
-            <input type="number" name="tp_pct" step="0.01" placeholder="e.g. 4.0" />
-          </label>
-        </div>
-        <button type="submit">Run backtest</button>
-      </form>
-
-      <section class="card">
-        <h2>Auth</h2>
-        <form action="/ui/login" method="post" class="grid">
-          <label>API Key
-            <input type="text" name="api_key" placeholder="KITE_API_KEY" required />
-          </label>
-          <label>API Secret
-            <input type="password" name="api_secret" placeholder="KITE_API_SECRET" required />
-          </label>
-          <div style="align-self:end">
-            <button type="submit">Login with Kite</button>
+          <div class="grid">
+            <label>Days (N)
+              <input type="number" name="days" value="{{ default_days }}" min="1" required />
+            </label>
+            <label>Exchange
+              <input type="text" name="exchange" value="{{ default_exchange }}" />
+            </label>
+            <label>Timezone
+              <input type="text" name="tz" value="{{ default_tz }}" />
+            </label>
+            <label>SL % (optional)
+              <input type="number" name="sl_pct" step="0.01" placeholder="e.g. 2.0" />
+            </label>
+            <label>TP % (optional)
+              <input type="number" name="tp_pct" step="0.01" placeholder="e.g. 4.0" />
+            </label>
           </div>
+          <div class="hint">Tip: SL/TP uses 15 minute candles to detect early exits.</div>
+          <button class="btn primary" type="submit">Run backtest</button>
         </form>
-        <p>Set your Redirect URL to <code>https://YOUR_DOMAIN/auth/callback</code>. After login, the app exchanges the token and shows your access token.</p>
+
+        <section class="card raise">
+          <h2>Auth</h2>
+          <form action="/ui/login" method="post" class="grid">
+            <label>API Key
+              <input type="text" name="api_key" placeholder="KITE_API_KEY" required />
+            </label>
+            <label>API Secret
+              <input type="password" name="api_secret" placeholder="KITE_API_SECRET" required />
+            </label>
+            <div style="align-self:end">
+              <button class="btn secondary" type="submit">Login with Kite</button>
+            </div>
+          </form>
+          <p>Set your Redirect URL to <code>https://YOUR_DOMAIN/auth/callback</code>. After login, the app exchanges the token and shows your access token.</p>
+        </section>
+      </div>
+
+      <section id="howto" class="card">
+        <h2>How it works</h2>
+        <ol class="howto">
+          <li>Enter API credentials and complete Kite login.</li>
+          <li>Upload your Chartink CSV.</li>
+          <li>Choose N days and optional SL/TP.</li>
+          <li>Review results, metrics, and equity curve.</li>
+        </ol>
       </section>
     </main>
   </body>

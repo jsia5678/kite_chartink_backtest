@@ -7,6 +7,12 @@
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
+    <header class="site-header">
+      <div class="container header-inner">
+        <div class="brand"><div class="logo-dot"></div><span>Backtest Results</span></div>
+        <nav class="header-actions"><a class="btn secondary" href="/">New backtest</a></nav>
+      </div>
+    </header>
     <main class="container">
       <h1>Results ({{ count }})</h1>
       {% if stats %}
@@ -23,6 +29,9 @@
       {% if error %}
       <div class="banner" style="background:#3a0f0f;border-color:#7f1d1d;color:#fecaca">Error: {{ error }}</div>
       {% endif %}
+      <div class="card raise" style="padding:0;margin-top:12px">
+        <canvas id="equityChart" height="120"></canvas>
+      </div>
       <div class="table-wrap">
         <table>
           <thead>
@@ -59,6 +68,27 @@
       </div>
       <p><a href="/">Back</a></p>
     </main>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  {% if equity %}
+  <script id="equity-data" type="application/json">{{ equity | tojson | safe }}</script>
+  {% endif %}
+  <script>
+    (function(){
+      try{
+        var el = document.getElementById('equity-data');
+        if(!el) return;
+        var data = JSON.parse(el.textContent || '[]');
+        if(!data.length) return;
+        var ctx = document.getElementById('equityChart');
+        var labels = data.map(function(_, i){ return i + 1; });
+        new Chart(ctx, {
+          type: 'line',
+          data: { labels: labels, datasets: [{ label: 'Equity (Base=100)', data: data, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.15)', tension: 0.2, fill: true, pointRadius: 0 }]},
+          options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { grid: { color: 'rgba(255,255,255,0.06)' } }, y: { grid: { color: 'rgba(255,255,255,0.06)' } } } }
+        });
+      } catch(e) {}
+    })();
+  </script>
   </body>
   </html>
 

@@ -26,6 +26,36 @@
         <div class="metric"><div class="k">R:R</div><div class="v">{{ '%.2f'|format(stats['risk_reward']) }}</div></div>
       </section>
       {% endif %}
+      {% if insights and insights.top_entry_times %}
+      <div class="card raise">
+        <h2>Best entry times (TP hit rate)</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Entry Time</th><th>Trades</th><th>TP hits</th><th>TP hit %</th><th>Avg Return %</th></tr></thead>
+          <tbody>
+            {% for t in insights.top_entry_times %}
+            <tr>
+              <td>{{ t.time }}</td><td>{{ t.trades }}</td><td>{{ t.tp_hits }}</td><td>{{ '%.2f'|format(t.tp_hit_rate) }}</td><td>{{ '%.2f'|format(t.avg_return) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table></div>
+      </div>
+      {% endif %}
+      {% if insights and insights.cap_performance %}
+      <div class="card raise">
+        <h2>Performance by cap bucket</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Cap</th><th>Trades</th><th>Win rate %</th><th>Avg Return %</th></tr></thead>
+          <tbody>
+            {% for c in insights.cap_performance %}
+            <tr>
+              <td>{{ c.cap }}</td><td>{{ c.trades }}</td><td>{{ '%.2f'|format(c.win_rate) }}</td><td>{{ '%.2f'|format(c.avg_return) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table></div>
+      </div>
+      {% endif %}
       {% if error %}
       <div class="banner" style="background:#3a0f0f;border-color:#7f1d1d;color:#fecaca">Error: {{ error }}</div>
       {% endif %}

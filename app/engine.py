@@ -191,3 +191,54 @@ def compute_equity_and_stats(df: pd.DataFrame) -> Tuple[List[float], Dict[str, f
     return equity, stats
 
 
+def compute_insights(df: pd.DataFrame) -> Dict[str, list]:
+    """Derive simple insights:
+    - Top 5 entry times by TP hit rate (break ties by trades, then avg return)
+    - Performance by cap bucket (Small/Mid/Large) approximated by entry price tertiles
+    """
+    insights: Dict[str, list] = {"top_entry_times": [], "cap_performance": []}
+
+    # Filter valid rows
+    valid = df.copy()
+    if "Return %" in valid.columns:
+        valid = valid[pd.to_numeric(valid["Return %"], errors="coerce").notna()]
+
+    # Top entry times by TP hits
+    if not valid.empty and "Entry Time" in valid.columns:
+        grouped = []
+        for entry_time, g in valid.groupby("Entry Time"):
+            total = len(g)
+            tp_hits = int((g.get("Exit Reason") == "TP").sum()) if "Exit Reason" in g.columns else 0
+            hit_rate = (tp_hits / total * 100.0) if total > 0 else 0.0
+            avg_ret = float(pd.to_numeric(g["Return %"], errors="coerce").mean()) if total > 0 else 0.0
+            grouped.append({"time": str(entry_time), "trades": total, "tp_hits": tp_hits, "tp_hit_rate": round(hit_rate, 2), "avg_return": round(avg_ret, 2)})
+        grouped.sort(key=lambda x: (x["tp_hit_rate"], x["trades"], x["avg_return"]), reverse=True)
+        insights["top_entry_times"] = grouped[:5]
+
+    # Cap performance approximation by entry price tertiles
+    if not valid.empty and "Entry Price" in valid.columns:
+        prices = pd.to_numeric(valid["Entry Price"], errors="coerce").dropna()
+        if len(prices) >= 3:
+            q1 = float(prices.quantile(1/3))
+            q2 = float(prices.quantile(2/3))
+            def bucket(p: float) -> str:
+                if p <= q1:
+                    return "Small"
+                if p <= q2:
+                    return "Mid"
+                return "Large"
+            tmp = valid.copy()
+            tmp["Cap Bucket"] = pd.to_numeric(tmp["Entry Price"], errors="coerce").apply(lambda p: bucket(p) if pd.notna(p) else None)
+            cap_rows = []
+            for cap, g in tmp.groupby("Cap Bucket"):
+                gret = pd.to_numeric(g["Return %"], errors="coerce").dropna()
+                trades = int(len(gret))
+                win_rate = (float((gret > 0).sum()) / trades * 100.0) if trades > 0 else 0.0
+                avg_ret = float(gret.mean()) if trades > 0 else 0.0
+                cap_rows.append({"cap": cap, "trades": trades, "win_rate": round(win_rate, 2), "avg_return": round(avg_ret, 2)})
+            cap_rows.sort(key=lambda x: (x["avg_return"], x["win_rate"]), reverse=True)
+            insights["cap_performance"] = cap_rows
+
+    return insights
+
+

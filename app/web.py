@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse, StreamingResponse, HTMLResponse, Red
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 
-from .engine import run_backtest_from_csv, compute_equity_and_stats
+from .engine import run_backtest_from_csv, compute_equity_and_stats, compute_insights
 from .kite_service import KiteService
 
 app = FastAPI(title="Kite Chartink Backtester")
@@ -151,9 +151,10 @@ async def ui_backtest(request: Request, file: UploadFile = File(...), days: int 
         df = run_backtest_from_csv(csv_path=tmp_path, num_days=days, exchange=exchange, timezone_name=tz, sl_pct=sl_pct, tp_pct=tp_pct)
         records = df.to_dict(orient="records")
         equity, stats = compute_equity_and_stats(df)
+        insights = compute_insights(df)
         return templates.TemplateResponse(
             "results.html",
-            {"request": request, "rows": records, "count": len(records), "stats": stats, "equity": equity},
+            {"request": request, "rows": records, "count": len(records), "stats": stats, "equity": equity, "insights": insights},
         )
     except Exception as e:
         # Show error on the results page instead of 500

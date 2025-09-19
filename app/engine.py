@@ -120,6 +120,7 @@ def run_backtest_from_csv(
     sl_pct: Optional[float] | None = None,
     tp_pct: Optional[float] | None = None,
     allowed_entry_times: Optional[List[str]] | None = None,
+    allowed_cap_buckets: Optional[List[str]] | None = None,
 ) -> pd.DataFrame:
     tz = pytz.timezone(timezone_name)
     kite = KiteService.from_env()
@@ -160,6 +161,25 @@ def run_backtest_from_csv(
             )
 
     df = pd.DataFrame(results)
+
+    # Derive cap buckets from entry price tertiles
+    if "Entry Price" in df.columns:
+        prices_series = pd.to_numeric(df["Entry Price"], errors="coerce")
+        if prices_series.notna().sum() >= 3:
+            q1 = float(prices_series.quantile(1/3))
+            q2 = float(prices_series.quantile(2/3))
+            def bucket(p: float) -> str:
+                if p <= q1:
+                    return "Small"
+                if p <= q2:
+                    return "Mid"
+                return "Large"
+            df["Cap Bucket"] = prices_series.apply(lambda p: bucket(p) if pd.notna(p) else None)
+            if allowed_cap_buckets:
+                allowed_set = {b for b in allowed_cap_buckets if b}
+                if allowed_set:
+                    df = df[df["Cap Bucket"].isin(allowed_set)]
+
     preferred = ["Stock", "Entry Date", "Entry Time", "Entry Price", "Exit Date", "Exit Time", "Exit Price", "Return %", "Exit Reason"]
     remaining = [c for c in df.columns if c not in preferred]
     return df[preferred + remaining]

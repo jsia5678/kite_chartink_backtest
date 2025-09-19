@@ -43,6 +43,9 @@ async def backtest_endpoint(
     entry_time: Optional[str] = Form(default=None),
     entry_time2: Optional[str] = Form(default=None),
     entry_time3: Optional[str] = Form(default=None),
+    cap_small: Optional[str] = Form(default=None),
+    cap_mid: Optional[str] = Form(default=None),
+    cap_large: Optional[str] = Form(default=None),
 ):
     # Save uploaded file to a temp buffer and run backtest
     content = await file.read()
@@ -54,6 +57,14 @@ async def backtest_endpoint(
 
     try:
         allowed = [t for t in [entry_time, entry_time2, entry_time3] if t]
+        cap_allowed = []
+        if cap_small:
+            cap_allowed.append("Small")
+        if cap_mid:
+            cap_allowed.append("Mid")
+        if cap_large:
+            cap_allowed.append("Large")
+
         df = run_backtest_from_csv(
             csv_path=tmp_path,
             num_days=days,
@@ -62,6 +73,7 @@ async def backtest_endpoint(
             sl_pct=_to_opt_float(sl_pct),
             tp_pct=_to_opt_float(tp_pct),
             allowed_entry_times=allowed or None,
+            allowed_cap_buckets=cap_allowed or None,
         )
         if output == "csv":
             csv_bytes = df.to_csv(index=False).encode("utf-8")
@@ -152,7 +164,7 @@ async def index(request: Request):
 
 
 @app.post("/ui/backtest", response_class=HTMLResponse)
-async def ui_backtest(request: Request, file: UploadFile = File(...), days: int = Form(...), exchange: str = Form("NSE"), tz: str = Form("Asia/Kolkata"), sl_pct: Optional[str] = Form(default=None), tp_pct: Optional[str] = Form(default=None), entry_time: Optional[str] = Form(default=None), entry_time2: Optional[str] = Form(default=None), entry_time3: Optional[str] = Form(default=None)):
+async def ui_backtest(request: Request, file: UploadFile = File(...), days: int = Form(...), exchange: str = Form("NSE"), tz: str = Form("Asia/Kolkata"), sl_pct: Optional[str] = Form(default=None), tp_pct: Optional[str] = Form(default=None), entry_time: Optional[str] = Form(default=None), entry_time2: Optional[str] = Form(default=None), entry_time3: Optional[str] = Form(default=None), cap_small: Optional[str] = Form(default=None), cap_mid: Optional[str] = Form(default=None), cap_large: Optional[str] = Form(default=None)):
     # Ensure required Kite credentials are available for engine via env
     try:
         cookie_api_key = (request.cookies.get("kite_api_key") or "").strip()
@@ -173,6 +185,14 @@ async def ui_backtest(request: Request, file: UploadFile = File(...), days: int 
 
     try:
         allowed = [t for t in [entry_time, entry_time2, entry_time3] if t]
+        cap_allowed = []
+        if cap_small:
+            cap_allowed.append("Small")
+        if cap_mid:
+            cap_allowed.append("Mid")
+        if cap_large:
+            cap_allowed.append("Large")
+
         df = run_backtest_from_csv(
             csv_path=tmp_path,
             num_days=days,
@@ -181,6 +201,7 @@ async def ui_backtest(request: Request, file: UploadFile = File(...), days: int 
             sl_pct=_to_opt_float(sl_pct),
             tp_pct=_to_opt_float(tp_pct),
             allowed_entry_times=allowed or None,
+            allowed_cap_buckets=cap_allowed or None,
         )
         records = df.to_dict(orient="records")
         equity, stats = compute_equity_and_stats(df)

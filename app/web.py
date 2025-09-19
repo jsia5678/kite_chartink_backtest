@@ -127,6 +127,19 @@ async def index(request: Request):
 
 @app.post("/ui/backtest", response_class=HTMLResponse)
 async def ui_backtest(request: Request, file: UploadFile = File(...), days: int = Form(...), exchange: str = Form("NSE"), tz: str = Form("Asia/Kolkata")):
+    # Ensure required Kite credentials are available for engine via env
+    try:
+        cookie_api_key = (request.cookies.get("kite_api_key") or "").strip()
+        cookie_access_token = (request.cookies.get("kite_access_token") or "").strip()
+        if cookie_api_key and not os.environ.get("KITE_API_KEY"):
+            os.environ["KITE_API_KEY"] = cookie_api_key
+        # Access token can also be loaded by the engine from token file; setting env helps if present
+        if cookie_access_token and not os.environ.get("KITE_ACCESS_TOKEN"):
+            os.environ["KITE_ACCESS_TOKEN"] = cookie_access_token
+    except Exception:
+        # Non-fatal; engine will still try token file and raise meaningful errors
+        pass
+
     content = await file.read()
     tmp_path = f"/tmp/{file.filename or 'input.csv'}"
     with open(tmp_path, "wb") as f:

@@ -121,6 +121,7 @@ def run_backtest_from_csv(
     tp_pct: Optional[float] | None = None,
     allowed_entry_times: Optional[List[str]] | None = None,
     allowed_cap_buckets: Optional[List[str]] | None = None,
+    symbol_cap_csv_path: Optional[str] | None = None,
 ) -> pd.DataFrame:
     tz = pytz.timezone(timezone_name)
     kite = KiteService.from_env()
@@ -162,8 +163,42 @@ def run_backtest_from_csv(
 
     df = pd.DataFrame(results)
 
-    # Derive cap buckets from entry price tertiles
-    if "Entry Price" in df.columns:
+    # Derive cap buckets: prefer provided metadata CSV; otherwise fallback to entry-price tertiles proxy
+    def normalize_symbol(s: str) -> str:
+        u = s.strip().upper()
+        if u.endswith(".NS"):
+            u = u[:-3]
+        return u
+
+    cap_series: Optional[pd.Series] = None
+    if symbol_cap_csv_path:
+        try:
+            meta = pd.read_csv(symbol_cap_csv_path)
+            # Expect columns: symbol, market_cap
+            cols = {c.lower(): c for c in meta.columns}
+            sym_col = cols.get("symbol") or cols.get("tradingsymbol") or list(meta.columns)[0]
+            mc_col = cols.get("market_cap") or cols.get("marketcap") or list(meta.columns)[1]
+            meta = meta[[sym_col, mc_col]].dropna()
+            meta[sym_col] = meta[sym_col].astype(str).map(normalize_symbol)
+            meta[mc_col] = pd.to_numeric(meta[mc_col], errors="coerce")
+            meta = meta.dropna()
+            m = meta.set_index(sym_col)[mc_col]
+            df_symbols = df.get("Stock").astype(str).map(normalize_symbol)
+            cap_series = df_symbols.map(m)
+        except Exception:
+            cap_series = None
+
+    if cap_series is not None and cap_series.notna().sum() >= 3:
+        q1 = float(cap_series.quantile(1/3))
+        q2 = float(cap_series.quantile(2/3))
+        def cap_bucket(mc: float) -> str:
+            if mc <= q1:
+                return "Small"
+            if mc <= q2:
+                return "Mid"
+            return "Large"
+        df["Cap Bucket"] = cap_series.apply(lambda mc: cap_bucket(mc) if pd.notna(mc) else None)
+    elif "Entry Price" in df.columns:
         prices_series = pd.to_numeric(df["Entry Price"], errors="coerce")
         if prices_series.notna().sum() >= 3:
             q1 = float(prices_series.quantile(1/3))
@@ -175,10 +210,11 @@ def run_backtest_from_csv(
                     return "Mid"
                 return "Large"
             df["Cap Bucket"] = prices_series.apply(lambda p: bucket(p) if pd.notna(p) else None)
-            if allowed_cap_buckets:
-                allowed_set = {b for b in allowed_cap_buckets if b}
-                if allowed_set:
-                    df = df[df["Cap Bucket"].isin(allowed_set)]
+
+    if allowed_cap_buckets and "Cap Bucket" in df.columns:
+        allowed_set = {b for b in allowed_cap_buckets if b}
+        if allowed_set:
+            df = df[df["Cap Bucket"].isin(allowed_set)]
 
     preferred = ["Stock", "Entry Date", "Entry Time", "Entry Price", "Exit Date", "Exit Time", "Exit Price", "Return %", "Exit Reason"]
     remaining = [c for c in df.columns if c not in preferred]

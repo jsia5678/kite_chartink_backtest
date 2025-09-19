@@ -46,6 +46,7 @@ async def backtest_endpoint(
     cap_small: Optional[str] = Form(default=None),
     cap_mid: Optional[str] = Form(default=None),
     cap_large: Optional[str] = Form(default=None),
+    cap_meta_csv: Optional[UploadFile] = File(default=None),
 ):
     # Save uploaded file to a temp buffer and run backtest
     content = await file.read()
@@ -68,6 +69,17 @@ async def backtest_endpoint(
         if not cap_allowed:
             cap_allowed = ["Small", "Mid", "Large"]
 
+        # Persist cap meta CSV if provided
+        cap_meta_path = None
+        if cap_meta_csv is not None:
+            try:
+                content = await cap_meta_csv.read()
+                cap_meta_path = f"/tmp/{cap_meta_csv.filename or 'cap_meta.csv'}"
+                with open(cap_meta_path, 'wb') as f:
+                    f.write(content)
+            except Exception:
+                cap_meta_path = None
+
         df = run_backtest_from_csv(
             csv_path=tmp_path,
             num_days=days,
@@ -77,6 +89,7 @@ async def backtest_endpoint(
             tp_pct=_to_opt_float(tp_pct),
             allowed_entry_times=allowed or None,
             allowed_cap_buckets=cap_allowed or None,
+            symbol_cap_csv_path=cap_meta_path,
         )
         if output == "csv":
             csv_bytes = df.to_csv(index=False).encode("utf-8")
@@ -167,7 +180,7 @@ async def index(request: Request):
 
 
 @app.post("/ui/backtest", response_class=HTMLResponse)
-async def ui_backtest(request: Request, file: UploadFile = File(...), days: int = Form(...), exchange: str = Form("NSE"), tz: str = Form("Asia/Kolkata"), sl_pct: Optional[str] = Form(default=None), tp_pct: Optional[str] = Form(default=None), entry_time: Optional[str] = Form(default=None), entry_time2: Optional[str] = Form(default=None), entry_time3: Optional[str] = Form(default=None), cap_small: Optional[str] = Form(default=None), cap_mid: Optional[str] = Form(default=None), cap_large: Optional[str] = Form(default=None)):
+async def ui_backtest(request: Request, file: UploadFile = File(...), days: int = Form(...), exchange: str = Form("NSE"), tz: str = Form("Asia/Kolkata"), sl_pct: Optional[str] = Form(default=None), tp_pct: Optional[str] = Form(default=None), entry_time: Optional[str] = Form(default=None), entry_time2: Optional[str] = Form(default=None), entry_time3: Optional[str] = Form(default=None), cap_small: Optional[str] = Form(default=None), cap_mid: Optional[str] = Form(default=None), cap_large: Optional[str] = Form(default=None), cap_meta_csv: Optional[UploadFile] = File(default=None)):
     # Ensure required Kite credentials are available for engine via env
     try:
         cookie_api_key = (request.cookies.get("kite_api_key") or "").strip()
@@ -198,6 +211,17 @@ async def ui_backtest(request: Request, file: UploadFile = File(...), days: int 
         if not cap_allowed:
             cap_allowed = ["Small", "Mid", "Large"]
 
+        # Persist cap meta CSV if provided
+        cap_meta_path = None
+        if cap_meta_csv is not None:
+            try:
+                content = await cap_meta_csv.read()
+                cap_meta_path = f"/tmp/{cap_meta_csv.filename or 'cap_meta.csv'}"
+                with open(cap_meta_path, 'wb') as f:
+                    f.write(content)
+            except Exception:
+                cap_meta_path = None
+
         df = run_backtest_from_csv(
             csv_path=tmp_path,
             num_days=days,
@@ -207,6 +231,7 @@ async def ui_backtest(request: Request, file: UploadFile = File(...), days: int 
             tp_pct=_to_opt_float(tp_pct),
             allowed_entry_times=allowed or None,
             allowed_cap_buckets=cap_allowed or None,
+            symbol_cap_csv_path=cap_meta_path,
         )
         records = df.to_dict(orient="records")
         equity, stats = compute_equity_and_stats(df)

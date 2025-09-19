@@ -240,23 +240,26 @@ def compute_insights(df: pd.DataFrame) -> Dict[str, list]:
         grouped.sort(key=lambda x: (x["tp_hit_rate"], x["trades"], x["avg_return"]), reverse=True)
         insights["top_entry_times"] = grouped[:5]
 
-    # Cap performance approximation by entry price tertiles
-    if not valid.empty and "Entry Price" in valid.columns:
-        prices = pd.to_numeric(valid["Entry Price"], errors="coerce").dropna()
-        if len(prices) >= 3:
-            q1 = float(prices.quantile(1/3))
-            q2 = float(prices.quantile(2/3))
-            def bucket(p: float) -> str:
-                if p <= q1:
-                    return "Small"
-                if p <= q2:
-                    return "Mid"
-                return "Large"
-            tmp = valid.copy()
-            tmp["Cap Bucket"] = pd.to_numeric(tmp["Entry Price"], errors="coerce").apply(lambda p: bucket(p) if pd.notna(p) else None)
+    # Cap performance: if precomputed buckets exist, use them; else approximate by price tertiles
+    if not valid.empty:
+        tmp = valid.copy()
+        if "Cap Bucket" not in tmp.columns and "Entry Price" in tmp.columns:
+            prices = pd.to_numeric(tmp["Entry Price"], errors="coerce").dropna()
+            if len(prices) >= 3:
+                q1 = float(prices.quantile(1/3))
+                q2 = float(prices.quantile(2/3))
+                def bucket(p: float) -> str:
+                    if p <= q1:
+                        return "Small"
+                    if p <= q2:
+                        return "Mid"
+                    return "Large"
+                tmp["Cap Bucket"] = pd.to_numeric(tmp["Entry Price"], errors="coerce").apply(lambda p: bucket(p) if pd.notna(p) else None)
+
+        if "Cap Bucket" in tmp.columns:
             cap_rows = []
             for cap, g in tmp.groupby("Cap Bucket"):
-                gret = pd.to_numeric(g["Return %"], errors="coerce").dropna()
+                gret = pd.to_numeric(g.get("Return %"), errors="coerce").dropna()
                 trades = int(len(gret))
                 win_rate = (float((gret > 0).sum()) / trades * 100.0) if trades > 0 else 0.0
                 avg_ret = float(gret.mean()) if trades > 0 else 0.0

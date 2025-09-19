@@ -57,6 +57,7 @@ async def backtest_endpoint(
 
     try:
         allowed = [t for t in [entry_time, entry_time2, entry_time3] if t]
+        # Default to including all caps if none explicitly selected
         cap_allowed = []
         if cap_small:
             cap_allowed.append("Small")
@@ -64,6 +65,8 @@ async def backtest_endpoint(
             cap_allowed.append("Mid")
         if cap_large:
             cap_allowed.append("Large")
+        if not cap_allowed:
+            cap_allowed = ["Small", "Mid", "Large"]
 
         df = run_backtest_from_csv(
             csv_path=tmp_path,
@@ -192,6 +195,8 @@ async def ui_backtest(request: Request, file: UploadFile = File(...), days: int 
             cap_allowed.append("Mid")
         if cap_large:
             cap_allowed.append("Large")
+        if not cap_allowed:
+            cap_allowed = ["Small", "Mid", "Large"]
 
         df = run_backtest_from_csv(
             csv_path=tmp_path,

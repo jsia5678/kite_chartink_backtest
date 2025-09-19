@@ -85,8 +85,10 @@ async def auth_callback(request: Request, request_token: str, api_secret: str | 
             return {"access_token": access_token, "saved_to": token_path}
 
         resp = RedirectResponse(url="/?authed=1", status_code=303)
-        # Optional cookie for UX; server reads token file/env, not this cookie
-        resp.set_cookie("kite_access_token", access_token, max_age=12 * 60 * 60, httponly=True, secure=True, samesite="lax")
+        # Optional cookie for UX; mark secure only on HTTPS
+        forwarded_proto = (request.headers.get("x-forwarded-proto") or "").split(",")[0].strip().lower()
+        cookie_secure = (request.url.scheme == "https") or (forwarded_proto == "https")
+        resp.set_cookie("kite_access_token", access_token, max_age=12 * 60 * 60, httponly=True, secure=cookie_secure, samesite="lax")
         return resp
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=400)
@@ -103,8 +105,10 @@ async def ui_login(request: Request, api_key: str = Form(...), api_secret: str =
     response = RedirectResponse(url, status_code=303)
     # Short-lived cookies (10 minutes)
     max_age = 10 * 60
-    response.set_cookie("kite_api_key", api_key.strip(), max_age=max_age, httponly=True, secure=True, samesite="lax")
-    response.set_cookie("kite_api_secret", api_secret.strip(), max_age=max_age, httponly=True, secure=True, samesite="lax")
+    forwarded_proto = (request.headers.get("x-forwarded-proto") or "").split(",")[0].strip().lower()
+    cookie_secure = (request.url.scheme == "https") or (forwarded_proto == "https")
+    response.set_cookie("kite_api_key", api_key.strip(), max_age=max_age, httponly=True, secure=cookie_secure, samesite="lax")
+    response.set_cookie("kite_api_secret", api_secret.strip(), max_age=max_age, httponly=True, secure=cookie_secure, samesite="lax")
     return response
 
 

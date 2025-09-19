@@ -21,6 +21,7 @@
               <th>Entry Time</th>
               <th>Entry Price</th>
               <th>Exit Date</th>
+              <th>Exit Time</th>
               <th>Exit Price</th>
               <th>Return %</th>
               <th>Error</th>
@@ -34,6 +35,7 @@
               <td>{{ row["Entry Time"] }}</td>
               <td>{{ row["Entry Price"] }}</td>
               <td>{{ row["Exit Date"] }}</td>
+              <td>{{ row.get("Exit Time", "") }}</td>
               <td>{{ row["Exit Price"] }}</td>
               <td>{{ row["Return %"] }}</td>
               <td>{{ row.get("Error", "") }}</td>

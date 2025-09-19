@@ -58,6 +58,14 @@ def compute_entry_exit_for_row(
     exit_ts = daily.index[exit_pos]
     exit_price = float(daily.iloc[exit_pos]["close"])  # type: ignore
 
+    # Determine exit time: prefer the candle timestamp if meaningful; else default to market close
+    exit_ts_local = exit_ts.astimezone(tz)
+    if exit_ts_local.hour == 0 and exit_ts_local.minute == 0:
+        # Daily candles can come with 00:00; default to market close for NSE
+        exit_time_str = "15:30"
+    else:
+        exit_time_str = exit_ts_local.strftime("%H:%M")
+
     ret_pct = (exit_price - entry_price) / entry_price * 100.0
 
     return {
@@ -66,6 +74,7 @@ def compute_entry_exit_for_row(
         "Entry Time": row.entry_time.strftime("%H:%M"),
         "Entry Price": round(entry_price, 4),
         "Exit Date": daily_dates[exit_pos].isoformat(),
+        "Exit Time": exit_time_str,
         "Exit Price": round(exit_price, 4),
         "Return %": round(ret_pct, 4),
     }
@@ -109,7 +118,7 @@ def run_backtest_from_csv(
 
     df = pd.DataFrame(results)
     # Order columns
-    preferred = ["Stock", "Entry Date", "Entry Time", "Entry Price", "Exit Date", "Exit Price", "Return %"]
+    preferred = ["Stock", "Entry Date", "Entry Time", "Entry Price", "Exit Date", "Exit Time", "Exit Price", "Return %"]
     remaining = [c for c in df.columns if c not in preferred]
     return df[preferred + remaining]
 

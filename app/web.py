@@ -291,6 +291,17 @@ async def ui_ai_strategy(
     into a CSV of entries with columns: stock, entry_date, entry_time. The CSV is then backtested.
     """
     try:
+        # Ensure required Kite credentials are available for engine via env (mirror /ui/backtest)
+        try:
+            cookie_api_key = (request.cookies.get("kite_api_key") or "").strip()
+            cookie_access_token = (request.cookies.get("kite_access_token") or "").strip()
+            if cookie_api_key and not os.environ.get("KITE_API_KEY"):
+                os.environ["KITE_API_KEY"] = cookie_api_key
+            if cookie_access_token and not os.environ.get("KITE_ACCESS_TOKEN"):
+                os.environ["KITE_ACCESS_TOKEN"] = cookie_access_token
+        except Exception:
+            pass
+
         pplx_key = os.environ.get("PPLX_API_KEY")
         # Allow key via cookie for convenience
         try:

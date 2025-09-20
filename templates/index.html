@@ -163,7 +163,11 @@
           <div class="form-group">
             <h3>Perplexity AI <span class="tooltip" title="Optional: For AI strategy generation">?</span>
               <span class="status-indicator" id="pplx-status">
+                {% if pplx_present %}
+                <span class="status-connected">✅ Connected</span>
+                {% else %}
                 <span class="status-disconnected">❌ Not Connected</span>
+                {% endif %}
               </span>
             </h3>
             <div class="input-group">
@@ -173,6 +177,7 @@
               </label>
             </div>
             <button type="button" class="btn secondary" onclick="savePplxKey()">Save Perplexity Key</button>
+            {% if pplx_present %}<div class="hint">Perplexity key already saved in this browser.</div>{% endif %}
           </div>
           
           <div class="nav-buttons">

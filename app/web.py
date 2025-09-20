@@ -193,6 +193,8 @@ async def index(request: Request):
             "default_days": 5,
             "default_exchange": os.environ.get("EXCHANGE", "NSE"),
             "default_tz": os.environ.get("MARKET_TZ", "Asia/Kolkata"),
+            "kite_connected": bool((request.cookies.get("kite_access_token") or "").strip()),
+            "pplx_present": bool((request.cookies.get("pplx_api_key") or "").strip()),
         },
     )
 

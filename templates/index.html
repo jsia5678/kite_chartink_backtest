@@ -5,139 +5,552 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Kite Backtester</title>
     <link rel="stylesheet" href="/static/styles.css" />
+    <style>
+      .wizard-container { max-width: 800px; margin: 0 auto; }
+      .step { display: none; margin-bottom: 2rem; }
+      .step.active { display: block; }
+      .step-header { display: flex; align-items: center; margin-bottom: 1.5rem; }
+      .step-number { 
+        background: #22c55e; color: white; border-radius: 50%; 
+        width: 32px; height: 32px; display: flex; align-items: center; 
+        justify-content: center; font-weight: bold; margin-right: 1rem; 
+      }
+      .step-number.inactive { background: #374151; }
+      .step-title { font-size: 1.25rem; font-weight: 600; }
+      
+      .progress-bar { 
+        background: #374151; height: 4px; border-radius: 2px; 
+        margin-bottom: 2rem; overflow: hidden; 
+      }
+      .progress-fill { 
+        background: #22c55e; height: 100%; transition: width 0.3s ease; 
+      }
+      
+      .form-group { 
+        background: rgba(255,255,255,0.05); border-radius: 8px; 
+        padding: 1.5rem; margin-bottom: 1.5rem; 
+      }
+      .form-group h3 { 
+        margin: 0 0 1rem 0; color: #22c55e; font-size: 1rem; 
+        display: flex; align-items: center; 
+      }
+      .tooltip { 
+        margin-left: 0.5rem; background: #374151; color: white; 
+        border-radius: 50%; width: 16px; height: 16px; 
+        display: inline-flex; align-items: center; justify-content: center; 
+        font-size: 0.75rem; cursor: help; 
+      }
+      
+      .input-group { position: relative; }
+      .eye-toggle { 
+        position: absolute; right: 12px; top: 50%; transform: translateY(-50%); 
+        cursor: pointer; user-select: none; 
+      }
+      
+      .nav-buttons { 
+        display: flex; justify-content: space-between; align-items: center; 
+        margin-top: 2rem; 
+      }
+      .btn-primary { 
+        background: #22c55e; padding: 12px 24px; 
+        font-size: 1.1rem; font-weight: 600; 
+      }
+      .btn-secondary { 
+        background: #6b7280; padding: 8px 16px; 
+      }
+      
+      .status-indicator { 
+        display: inline-flex; align-items: center; margin-left: 0.5rem; 
+        font-size: 0.875rem; 
+      }
+      .status-connected { color: #22c55e; }
+      .status-disconnected { color: #ef4444; }
+      
+      .data-source-tabs { 
+        display: flex; margin-bottom: 1.5rem; border-radius: 8px; 
+        background: rgba(255,255,255,0.05); 
+      }
+      .tab { 
+        flex: 1; padding: 12px; text-align: center; cursor: pointer; 
+        border-radius: 8px; transition: all 0.2s; 
+      }
+      .tab.active { background: #22c55e; color: white; }
+      .tab:not(.active) { color: #9ca3af; }
+      
+      .data-content { display: none; }
+      .data-content.active { display: block; }
+      
+      .fixed-action { 
+        position: fixed; bottom: 24px; right: 24px; z-index: 100; 
+      }
+      .fixed-action button { 
+        background: #22c55e; color: white; border: none; 
+        padding: 16px 32px; border-radius: 8px; font-size: 1.1rem; 
+        font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(34,197,94,0.3); 
+      }
+      
+      .theme-toggle { 
+        position: fixed; top: 20px; right: 20px; 
+        background: rgba(255,255,255,0.1); border: none; 
+        color: white; padding: 8px; border-radius: 6px; 
+        cursor: pointer; 
+      }
+      
+      .error { border-color: #ef4444 !important; }
+      .error-msg { color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem; }
+      
+      .preview-placeholder { 
+        background: rgba(255,255,255,0.05); border-radius: 8px; 
+        padding: 3rem; text-align: center; color: #9ca3af; 
+        border: 2px dashed #374151; 
+      }
+    </style>
   </head>
   <body>
+    <button class="theme-toggle" onclick="toggleTheme()">🌙</button>
+    
     <header class="site-header">
       <div class="container header-inner">
         <div class="brand"><div class="logo-dot"></div><span>Kite Chartink Backtester</span></div>
-        <nav class="header-actions"><a class="btn secondary" href="#howto">How it works</a></nav>
       </div>
     </header>
+    
     <main class="container">
       <section class="hero">
         <h1>Run lightning-fast backtests on real Kite data</h1>
-        <p class="sub">Upload a Chartink CSV, set parameters, and get analytics with optional SL/TP exits.</p>
+        <p class="sub">Upload a Chartink CSV or describe your strategy with AI, set parameters, and get analytics with optional SL/TP exits.</p>
       </section>
+      
       {% if request.query_params.get('authed') == '1' %}
       <div class="banner">Kite authentication successful. You can run your backtest now.</div>
       {% endif %}
-      <div class="grid-2">
-        <form action="/ui/backtest" method="post" enctype="multipart/form-data" class="card raise">
-          <h2>Backtest</h2>
-          <label>CSV file
-            <input type="file" name="file" accept=".csv" required />
-          </label>
-          <div class="grid">
-            <label>Days (N)
-              <input type="number" name="days" value="{{ default_days }}" min="1" required />
-            </label>
-            <label>Exchange
-              <input type="text" name="exchange" value="{{ default_exchange }}" />
-            </label>
-            <label>Timezone
-              <input type="text" name="tz" value="{{ default_tz }}" />
-            </label>
-            <label>SL % (optional)
-              <input type="number" name="sl_pct" step="0.01" placeholder="e.g. 2.0" />
-            </label>
-            <label>TP % (optional)
-              <input type="number" name="tp_pct" step="0.01" placeholder="e.g. 4.0" />
-            </label>
-            <label>Breakeven at profit %
-              <input type="number" name="breakeven_profit_pct" step="0.01" placeholder="e.g. 1.0" />
-            </label>
-            <label style="align-self:end">
-              <input type="checkbox" name="breakeven_at_sl" value="1" /> Breakeven when profit ≥ SL %
+      
+      <div class="wizard-container">
+        <div class="progress-bar">
+          <div class="progress-fill" style="width: 25%"></div>
+        </div>
+        
+        <!-- Step 1: API Connection -->
+        <div class="step active" id="step1">
+          <div class="step-header">
+            <div class="step-number">1</div>
+            <div class="step-title">Connect APIs</div>
+          </div>
+          
+          <div class="form-group">
+            <h3>Kite Connect <span class="tooltip" title="Required for market data">?</span>
+              <span class="status-indicator" id="kite-status">
+                <span class="status-disconnected">❌ Not Connected</span>
+              </span>
+            </h3>
+            <div class="grid">
+              <div class="input-group">
+                <label>API Key
+                  <input type="text" id="kite-api-key" placeholder="KITE_API_KEY" required />
+                  <span class="eye-toggle" onclick="togglePassword('kite-api-key')">👁️</span>
+                </label>
+              </div>
+              <div class="input-group">
+                <label>API Secret
+                  <input type="password" id="kite-api-secret" placeholder="KITE_API_SECRET" required />
+                  <span class="eye-toggle" onclick="togglePassword('kite-api-secret')">👁️</span>
+                </label>
+              </div>
+            </div>
+            <button type="button" class="btn secondary" onclick="connectKite()">Connect Kite</button>
+          </div>
+          
+          <div class="form-group">
+            <h3>Perplexity AI <span class="tooltip" title="Optional: For AI strategy generation">?</span>
+              <span class="status-indicator" id="pplx-status">
+                <span class="status-disconnected">❌ Not Connected</span>
+              </span>
+            </h3>
+            <div class="input-group">
+              <label>Perplexity API Key
+                <input type="password" id="pplx-api-key" placeholder="PPLX_API_KEY (optional)" />
+                <span class="eye-toggle" onclick="togglePassword('pplx-api-key')">👁️</span>
+              </label>
+            </div>
+            <button type="button" class="btn secondary" onclick="savePplxKey()">Save Perplexity Key</button>
+          </div>
+          
+          <div class="nav-buttons">
+            <div></div>
+            <button type="button" class="btn primary" onclick="nextStep()">Next: Choose Data Source</button>
+          </div>
+        </div>
+        
+        <!-- Step 2: Data Source -->
+        <div class="step" id="step2">
+          <div class="step-header">
+            <div class="step-number">2</div>
+            <div class="step-title">Choose Data Source</div>
+          </div>
+          
+          <div class="data-source-tabs">
+            <div class="tab active" onclick="switchTab('csv')">Upload CSV</div>
+            <div class="tab" onclick="switchTab('ai')">AI Strategy</div>
+          </div>
+          
+          <div class="data-content active" id="csv-content">
+            <div class="form-group">
+              <h3>Chartink CSV File <span class="tooltip" title="CSV with columns: stock, entry_date, entry_time">?</span></h3>
+              <label>CSV file
+                <input type="file" id="csv-file" accept=".csv" />
+              </label>
+            </div>
+          </div>
+          
+          <div class="data-content" id="ai-content">
+            <div class="form-group">
+              <h3>Strategy Description <span class="tooltip" title="Describe your trading strategy in natural language">?</span></h3>
+              <label>Describe your strategy idea
+                <textarea id="strategy-prompt" rows="6" placeholder="e.g., Momentum strategy: Buy large-cap stocks making new 20-day highs with strong volume, entries after 09:45 IST on breakout days in the last 3 months."></textarea>
+              </label>
+              <div class="grid">
+                <label>Timeframe (optional) <span class="tooltip" title="1m, 5m, 15m, 30m, 1h">?</span>
+                  <input type="text" id="timeframe" placeholder="e.g. 15m, 5m, 1h" />
+                </label>
+                <label>From date (optional)
+                  <input type="date" id="from-date" />
+                </label>
+                <label>To date (optional)
+                  <input type="date" id="to-date" />
+                </label>
+              </div>
+            </div>
+          </div>
+          
+          <div class="nav-buttons">
+            <button type="button" class="btn secondary" onclick="prevStep()">← Previous</button>
+            <button type="button" class="btn primary" onclick="nextStep()">Next: Set Parameters</button>
+          </div>
+        </div>
+        
+        <!-- Step 3: Parameters -->
+        <div class="step" id="step3">
+          <div class="step-header">
+            <div class="step-number">3</div>
+            <div class="step-title">Set Parameters</div>
+          </div>
+          
+          <div class="form-group">
+            <h3>Basic Settings <span class="tooltip" title="Core backtest parameters">?</span></h3>
+            <div class="grid">
+              <label>Days (N) <span class="tooltip" title="Number of trading days to hold position">?</span>
+                <input type="number" id="days" value="{{ default_days }}" min="1" required />
+                <div class="error-msg" id="days-error"></div>
+              </label>
+              <label>Exchange <span class="tooltip" title="Stock exchange (NSE recommended)">?</span>
+                <input type="text" id="exchange" value="{{ default_exchange }}" />
+              </label>
+              <label>Timezone <span class="tooltip" title="Market timezone">?</span>
+                <input type="text" id="timezone" value="{{ default_tz }}" />
+              </label>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <h3>Risk Settings <span class="tooltip" title="Stop loss and take profit levels">?</span></h3>
+            <div class="grid">
+              <label>SL % (optional) <span class="tooltip" title="Stop loss % from entry price (0.5-10 typical)">?</span>
+                <input type="number" id="sl-pct" step="0.01" placeholder="e.g. 2.0" />
+                <div class="error-msg" id="sl-error"></div>
+              </label>
+              <label>TP % (optional) <span class="tooltip" title="Take profit % from entry price (1-20 typical)">?</span>
+                <input type="number" id="tp-pct" step="0.01" placeholder="e.g. 4.0" />
+                <div class="error-msg" id="tp-error"></div>
+              </label>
+              <label>Breakeven at profit % <span class="tooltip" title="Move SL to breakeven when profit reaches this %">?</span>
+                <input type="number" id="breakeven-profit" step="0.01" placeholder="e.g. 1.0" />
+              </label>
+            </div>
+            <label style="margin-top: 1rem;">
+              <input type="checkbox" id="breakeven-at-sl" /> 
+              <span>Breakeven when profit ≥ SL % <span class="tooltip" title="Move SL to entry when profit equals SL percentage">?</span></span>
             </label>
           </div>
-          <div class="hint">Tip: SL/TP uses 15 minute candles to detect early exits.</div>
-          <button class="btn primary" type="submit">Run backtest</button>
-        </form>
-
-        <form action="/ui/ai_strategy" method="post" class="card raise">
-          <h2>AI Strategy (Perplexity)</h2>
-          <label>Describe your strategy idea
-            <textarea name="prompt" rows="6" placeholder="e.g., Momentum strategy: Buy large-cap stocks making new 20-day highs with strong volume, entries after 09:45 IST on breakout days in the last 3 months." required></textarea>
-          </label>
-          <div class="grid">
-            <label>Days (N)
-              <input type="number" name="days" value="{{ default_days }}" min="1" required />
-            </label>
-            <label>Exchange
-              <input type="text" name="exchange" value="{{ default_exchange }}" />
-            </label>
-            <label>Timezone
-              <input type="text" name="tz" value="{{ default_tz }}" />
-            </label>
-            <label>Timeframe (optional)
-              <input type="text" name="timeframe" placeholder="e.g. 15m, 5m, 1h" />
-            </label>
-            <label>From date (optional)
-              <input type="date" name="from_date" />
-            </label>
-            <label>To date (optional)
-              <input type="date" name="to_date" />
-            </label>
-            <label>SL % (optional)
-              <input type="number" name="sl_pct" step="0.01" placeholder="e.g. 2.0" />
-            </label>
-            <label>TP % (optional)
-              <input type="number" name="tp_pct" step="0.01" placeholder="e.g. 4.0" />
-            </label>
-            <label>Breakeven at profit %
-              <input type="number" name="breakeven_profit_pct" step="0.01" placeholder="e.g. 1.0" />
-            </label>
-            <label style="align-self:end">
-              <input type="checkbox" name="breakeven_at_sl" value="1" /> Breakeven when profit ≥ SL %
-            </label>
+          
+          <div class="nav-buttons">
+            <button type="button" class="btn secondary" onclick="prevStep()">← Previous</button>
+            <button type="button" class="btn primary" onclick="nextStep()">Next: Review & Run</button>
           </div>
-          <div class="hint">AI will synthesize a CSV of historical entries based on your idea and run the backtest.</div>
-          <button class="btn primary" type="submit">Generate and backtest</button>
-        </form>
-
-        <section class="card raise">
-          <h2>Auth</h2>
-          <form action="/ui/login" method="post" class="grid">
-            <label>API Key
-              <input type="text" name="api_key" placeholder="KITE_API_KEY" required />
-            </label>
-            <label>API Secret
-              <input type="password" name="api_secret" placeholder="KITE_API_SECRET" required />
-            </label>
-            <div style="align-self:end">
-              <button class="btn secondary" type="submit">Login with Kite</button>
-            </div>
-          </form>
-          <p>Set your Redirect URL to <code>https://YOUR_DOMAIN/auth/callback</code>. After login, the app exchanges the token and shows your access token.</p>
-        </section>
+        </div>
+        
+        <!-- Step 4: Review & Run -->
+        <div class="step" id="step4">
+          <div class="step-header">
+            <div class="step-number">4</div>
+            <div class="step-title">Review & Run Backtest</div>
+          </div>
+          
+          <div class="form-group">
+            <h3>Summary</h3>
+            <div id="summary-content"></div>
+          </div>
+          
+          <div class="preview-placeholder">
+            <h3>📊 Your Results Will Appear Here</h3>
+            <p>Trades table, metrics (win rate, returns, drawdown), and equity curve</p>
+          </div>
+          
+          <div class="nav-buttons">
+            <button type="button" class="btn secondary" onclick="prevStep()">← Previous</button>
+            <button type="button" class="btn primary" id="run-backtest-btn" onclick="runBacktest()">🚀 Run Backtest</button>
+          </div>
+        </div>
       </div>
-
-      <div class="grid-2" style="margin-top:16px">
-        <section class="card raise">
-          <h2>Perplexity</h2>
-          <form action="/ui/pplx_key" method="post" class="grid">
-            <label>Perplexity API Key
-              <input type="password" name="pplx_api_key" placeholder="PPLX_API_KEY" required />
-            </label>
-            <div style="align-self:end">
-              <button class="btn secondary" type="submit">Save Perplexity key</button>
-            </div>
-          </form>
-          <p>This stores the key in an HttpOnly cookie for this browser session.</p>
-        </section>
-      </div>
-
-      <section id="howto" class="card">
-        <h2>How it works</h2>
-        <ol class="howto">
-          <li>Enter API credentials and complete Kite login.</li>
-          <li>Upload your Chartink CSV.</li>
-          <li>Choose N days and optional SL/TP.</li>
-          <li>Review results, metrics, and equity curve.</li>
-        </ol>
-      </section>
     </main>
+    
+    <script>
+      let currentStep = 1;
+      let dataSource = 'csv';
+      let kiteConnected = false;
+      let pplxConnected = false;
+      
+      function updateProgress() {
+        const progress = (currentStep / 4) * 100;
+        document.querySelector('.progress-fill').style.width = progress + '%';
+      }
+      
+      function showStep(step) {
+        document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+        document.getElementById('step' + step).classList.add('active');
+        
+        document.querySelectorAll('.step-number').forEach((num, i) => {
+          num.classList.toggle('inactive', i + 1 > step);
+        });
+        
+        updateProgress();
+      }
+      
+      function nextStep() {
+        if (validateCurrentStep()) {
+          if (currentStep < 4) {
+            currentStep++;
+            showStep(currentStep);
+            if (currentStep === 4) updateSummary();
+          }
+        }
+      }
+      
+      function prevStep() {
+        if (currentStep > 1) {
+          currentStep--;
+          showStep(currentStep);
+        }
+      }
+      
+      function validateCurrentStep() {
+        if (currentStep === 1) {
+          if (!kiteConnected) {
+            alert('Please connect to Kite first');
+            return false;
+          }
+        } else if (currentStep === 2) {
+          if (dataSource === 'csv' && !document.getElementById('csv-file').files.length) {
+            alert('Please select a CSV file');
+            return false;
+          } else if (dataSource === 'ai' && !document.getElementById('strategy-prompt').value.trim()) {
+            alert('Please describe your strategy');
+            return false;
+          }
+        } else if (currentStep === 3) {
+          return validateParameters();
+        }
+        return true;
+      }
+      
+      function validateParameters() {
+        let valid = true;
+        
+        const days = document.getElementById('days').value;
+        if (!days || days < 1) {
+          showError('days-error', 'Days must be >= 1');
+          valid = false;
+        } else {
+          clearError('days-error');
+        }
+        
+        const sl = document.getElementById('sl-pct').value;
+        if (sl && (sl < 0 || sl > 50)) {
+          showError('sl-error', 'SL % should be 0-50');
+          valid = false;
+        } else {
+          clearError('sl-error');
+        }
+        
+        const tp = document.getElementById('tp-pct').value;
+        if (tp && (tp < 0 || tp > 100)) {
+          showError('tp-error', 'TP % should be 0-100');
+          valid = false;
+        } else {
+          clearError('tp-error');
+        }
+        
+        return valid;
+      }
+      
+      function showError(id, message) {
+        const errorEl = document.getElementById(id);
+        const inputEl = errorEl.previousElementSibling;
+        errorEl.textContent = message;
+        inputEl.classList.add('error');
+      }
+      
+      function clearError(id) {
+        const errorEl = document.getElementById(id);
+        const inputEl = errorEl.previousElementSibling;
+        errorEl.textContent = '';
+        inputEl.classList.remove('error');
+      }
+      
+      function switchTab(tab) {
+        dataSource = tab;
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.data-content').forEach(c => c.classList.remove('active'));
+        
+        event.target.classList.add('active');
+        document.getElementById(tab + '-content').classList.add('active');
+      }
+      
+      function togglePassword(id) {
+        const input = document.getElementById(id);
+        input.type = input.type === 'password' ? 'text' : 'password';
+      }
+      
+      async function connectKite() {
+        const apiKey = document.getElementById('kite-api-key').value.trim();
+        const apiSecret = document.getElementById('kite-api-secret').value.trim();
+        
+        if (!apiKey || !apiSecret) {
+          alert('Please enter both API Key and Secret');
+          return;
+        }
+        
+        const form = new FormData();
+        form.append('api_key', apiKey);
+        form.append('api_secret', apiSecret);
+        
+        try {
+          const response = await fetch('/ui/login', { method: 'POST', body: form });
+          if (response.redirected) {
+            window.location.href = response.url;
+          }
+        } catch (error) {
+          alert('Connection failed: ' + error.message);
+        }
+      }
+      
+      async function savePplxKey() {
+        const key = document.getElementById('pplx-api-key').value.trim();
+        if (!key) return;
+        
+        const form = new FormData();
+        form.append('pplx_api_key', key);
+        
+        try {
+          const response = await fetch('/ui/pplx_key', { method: 'POST', body: form });
+          if (response.ok) {
+            pplxConnected = true;
+            updateConnectionStatus('pplx', true);
+          }
+        } catch (error) {
+          alert('Failed to save key: ' + error.message);
+        }
+      }
+      
+      function updateConnectionStatus(type, connected) {
+        const statusEl = document.getElementById(type + '-status');
+        statusEl.innerHTML = connected ? 
+          '<span class="status-connected">✅ Connected</span>' : 
+          '<span class="status-disconnected">❌ Not Connected</span>';
+      }
+      
+      function updateSummary() {
+        const summary = document.getElementById('summary-content');
+        const source = dataSource === 'csv' ? 
+          'CSV File: ' + (document.getElementById('csv-file').files[0]?.name || 'None') :
+          'AI Strategy: ' + (document.getElementById('strategy-prompt').value.substring(0, 50) + '...');
+        
+        summary.innerHTML = `
+          <p><strong>Data Source:</strong> ${source}</p>
+          <p><strong>Days:</strong> ${document.getElementById('days').value}</p>
+          <p><strong>Exchange:</strong> ${document.getElementById('exchange').value}</p>
+          <p><strong>SL:</strong> ${document.getElementById('sl-pct').value || 'None'}%</p>
+          <p><strong>TP:</strong> ${document.getElementById('tp-pct').value || 'None'}%</p>
+        `;
+      }
+      
+      async function runBacktest() {
+        const btn = document.getElementById('run-backtest-btn');
+        btn.disabled = true;
+        btn.textContent = '⏳ Running...';
+        
+        const form = new FormData();
+        
+        // Common parameters
+        form.append('days', document.getElementById('days').value);
+        form.append('exchange', document.getElementById('exchange').value);
+        form.append('tz', document.getElementById('timezone').value);
+        
+        const sl = document.getElementById('sl-pct').value;
+        const tp = document.getElementById('tp-pct').value;
+        const breakeven = document.getElementById('breakeven-profit').value;
+        
+        if (sl) form.append('sl_pct', sl);
+        if (tp) form.append('tp_pct', tp);
+        if (breakeven) form.append('breakeven_profit_pct', breakeven);
+        if (document.getElementById('breakeven-at-sl').checked) form.append('breakeven_at_sl', '1');
+        
+        let endpoint;
+        if (dataSource === 'csv') {
+          endpoint = '/ui/backtest';
+          const file = document.getElementById('csv-file').files[0];
+          form.append('file', file);
+        } else {
+          endpoint = '/ui/ai_strategy';
+          form.append('prompt', document.getElementById('strategy-prompt').value);
+          
+          const timeframe = document.getElementById('timeframe').value;
+          const fromDate = document.getElementById('from-date').value;
+          const toDate = document.getElementById('to-date').value;
+          
+          if (timeframe) form.append('timeframe', timeframe);
+          if (fromDate) form.append('from_date', fromDate);
+          if (toDate) form.append('to_date', toDate);
+        }
+        
+        try {
+          const response = await fetch(endpoint, { method: 'POST', body: form });
+          const text = await response.text();
+          document.open();
+          document.write(text);
+          document.close();
+        } catch (error) {
+          alert('Backtest failed: ' + error.message);
+          btn.disabled = false;
+          btn.textContent = '🚀 Run Backtest';
+        }
+      }
+      
+      function toggleTheme() {
+        document.body.classList.toggle('light-theme');
+        const btn = document.querySelector('.theme-toggle');
+        btn.textContent = document.body.classList.contains('light-theme') ? '☀️' : '🌙';
+      }
+      
+      // Check connection status on load
+      if (new URLSearchParams(window.location.search).get('authed') === '1') {
+        kiteConnected = true;
+        updateConnectionStatus('kite', true);
+      }
+      
+      // Validate inputs in real-time
+      document.getElementById('days').addEventListener('input', () => clearError('days-error'));
+      document.getElementById('sl-pct').addEventListener('input', () => clearError('sl-error'));
+      document.getElementById('tp-pct').addEventListener('input', () => clearError('tp-error'));
+    </script>
   </body>
-  </html>
-
-
+</html>

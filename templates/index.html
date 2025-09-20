@@ -435,13 +435,15 @@
         connectBtn.disabled = true;
         
         try {
-          // Use the same endpoint as manual login since it works
+          // Set cookies for the auth callback to use
+          document.cookie = `kite_api_key=${encodeURIComponent(apiKey)}; path=/; max-age=600; SameSite=Lax`;
+          document.cookie = `kite_api_secret=${encodeURIComponent(apiSecret)}; path=/; max-age=600; SameSite=Lax`;
+          
+          // Get login URL
           const response = await fetch(`/login_url?api_key=${encodeURIComponent(apiKey)}`);
           const data = await response.json();
           
           if (data.login_url) {
-            // Store API secret for later use
-            sessionStorage.setItem('kite_api_secret', apiSecret);
             // Redirect to Kite login
             window.location.href = data.login_url;
           } else {

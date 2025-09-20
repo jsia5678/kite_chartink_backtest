@@ -122,16 +122,22 @@ async def auth_callback(request: Request, request_token: str, api_secret: str | 
         # Exchange request_token for access_token
         key = api_key or request.cookies.get("kite_api_key") or os.environ.get("KITE_API_KEY")
         if not key:
-            raise ValueError("Missing api_key. Pass ?api_key=... or set KITE_API_KEY")
-        # Prefer provided api_secret, else read from env
+            raise ValueError("Missing API key. Please ensure cookies are enabled and try logging in again.")
+        
+        # Prefer provided api_secret, else read from cookies/env
         secret = api_secret or request.cookies.get("kite_api_secret") or os.environ.get("KITE_API_SECRET")
         if not secret:
-            raise ValueError("KITE_API_SECRET not provided or set")
+            raise ValueError("Missing API secret. Please ensure cookies are enabled and try logging in again.")
+        
         # Trim accidental whitespace
         key = key.strip()
         secret = secret.strip()
+        
+        # Log for debugging (remove in production)
+        print(f"Auth callback: key={key[:8]}..., secret={'*' * len(secret)}, request_token={request_token[:8]}...")
 
         access_token = KiteService.exchange_request_token(api_key=key, api_secret=secret, request_token=request_token)
+        
         # Optionally persist to token file
         token_path = os.environ.get("KITE_TOKEN_PATH", "/tmp/kite_token.json")
         try:
@@ -150,9 +156,14 @@ async def auth_callback(request: Request, request_token: str, api_secret: str | 
         forwarded_proto = (request.headers.get("x-forwarded-proto") or "").split(",")[0].strip().lower()
         cookie_secure = (request.url.scheme == "https") or (forwarded_proto == "https")
         resp.set_cookie("kite_access_token", access_token, max_age=12 * 60 * 60, httponly=True, secure=cookie_secure, samesite="lax")
+        resp.set_cookie("kite_api_key", key, max_age=12 * 60 * 60, httponly=True, secure=cookie_secure, samesite="lax")
         return resp
     except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=400)
+        print(f"Auth callback error: {e}")
+        error_msg = str(e)
+        if "invalid" in error_msg.lower() or "expired" in error_msg.lower():
+            error_msg = "Authentication failed. Please check your API credentials and try again."
+        return JSONResponse({"error": error_msg}, status_code=400)
 
 
 @app.post("/ui/login")

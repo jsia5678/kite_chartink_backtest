@@ -11,11 +11,11 @@ from fastapi.responses import JSONResponse, StreamingResponse, HTMLResponse, Red
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 
-from .engine import run_backtest_from_csv, compute_equity_and_stats, compute_insights
+from .engine import run_backtest_from_csv, compute_equity_and_stats, compute_insights, compute_entry_exit_for_row
 import httpx
 import json as _json
 from .kite_service import KiteService
-from .utils import parse_chartink_csv, compute_entry_exit_for_row
+from .utils import parse_chartink_csv
 
 app = FastAPI(title="Kite Chartink Backtester")
 templates = Jinja2Templates(directory="templates")

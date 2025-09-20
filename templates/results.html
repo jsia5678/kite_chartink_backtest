@@ -23,6 +23,9 @@
       {% if ai_prompt %}
       <div class="banner">AI Strategy prompt used: <em>{{ ai_prompt }}</em></div>
       {% endif %}
+      {% if defaults and (defaults.from_date or defaults.to_date) %}
+      <div class="banner" style="opacity:0.85">Date filter applied: {{ defaults.from_date or '...' }} → {{ defaults.to_date or '...' }}</div>
+      {% endif %}
 
       <div class="layout-2col">
         <aside class="sidebar">

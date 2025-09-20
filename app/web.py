@@ -449,10 +449,38 @@ async def ui_ai_strategy(
                     break
             content = csv_text or content
 
-        # Persist CSV to temp and run backtest
+        # Persist CSV to temp after enforcing optional date range
         tmp_csv_path = "/tmp/ai_strategy.csv"
-        with open(tmp_csv_path, "w", encoding="utf-8") as f:
-            f.write(content.strip())
+        try:
+            import io as _io
+            # Parse and normalize CSV
+            _df = pd.read_csv(_io.StringIO(content.strip()))
+            cols = {c.lower().strip(): c for c in _df.columns}
+            # Standardize expected column names if variants are present
+            if "stock" not in cols or "entry_date" not in cols or "entry_time" not in cols:
+                # Try forgiving rename using lower-case
+                _df.columns = [str(c).strip() for c in _df.columns]
+                lower_map = {c.lower(): c for c in _df.columns}
+                cols = lower_map
+            # Filter date range if provided
+            if from_date or to_date:
+                try:
+                    date_col = cols.get("entry_date", "entry_date")
+                    _df[date_col] = pd.to_datetime(_df[date_col]).dt.date
+                    _from = pd.to_datetime(from_date).date() if from_date else None
+                    _to = pd.to_datetime(to_date).date() if to_date else None
+                    if _from:
+                        _df = _df[_df[date_col] >= _from]
+                    if _to:
+                        _df = _df[_df[date_col] <= _to]
+                except Exception:
+                    # If parsing fails, fall back to raw content
+                    pass
+            _df.to_csv(tmp_csv_path, index=False)
+        except Exception:
+            # Fallback: write raw content
+            with open(tmp_csv_path, "w", encoding="utf-8") as f:
+                f.write(content.strip())
 
         df = run_backtest_from_csv(
             csv_path=tmp_csv_path,

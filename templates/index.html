@@ -564,6 +564,17 @@
       document.getElementById('days').addEventListener('input', () => clearError('days-error'));
       document.getElementById('sl-pct').addEventListener('input', () => clearError('sl-error'));
       document.getElementById('tp-pct').addEventListener('input', () => clearError('tp-error'));
+
+      // Keep the Quick Re-run defaults in sync by storing last-used params in localStorage
+      try {
+        const syncKeys = ['days','exchange','timezone','sl-pct','tp-pct','breakeven-profit'];
+        syncKeys.forEach(id => {
+          const el = document.getElementById(id);
+          const key = 'bt_'+id;
+          if(localStorage.getItem(key)) el.value = localStorage.getItem(key);
+          el.addEventListener('change', ()=> localStorage.setItem(key, el.value));
+        });
+      } catch(e) {}
     </script>
   </body>
 </html>

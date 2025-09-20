@@ -158,6 +158,9 @@
               </div>
             </div>
             <button type="button" class="btn secondary" onclick="connectKite()">Connect Kite</button>
+            <p style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.5rem;">
+              Or manually visit: <a href="#" onclick="openKiteLogin()" style="color: #3b82f6;">Kite Login URL</a>
+            </p>
           </div>
           
           <div class="form-group">
@@ -429,17 +432,51 @@
           return;
         }
         
+        const connectBtn = document.querySelector('.btn.secondary');
+        const originalText = connectBtn.textContent;
+        connectBtn.textContent = '⏳ Connecting...';
+        connectBtn.disabled = true;
+        
         const form = new FormData();
         form.append('api_key', apiKey);
         form.append('api_secret', apiSecret);
         
         try {
-          const response = await fetch('/ui/login', { method: 'POST', body: form });
-          if (response.redirected) {
-            window.location.href = response.url;
+          const response = await fetch('/ui/login', { 
+            method: 'POST', 
+            body: form,
+            redirect: 'manual'
+          });
+          
+          if (response.status === 0 || response.type === 'opaqueredirect') {
+            // Handle redirect manually
+            window.location.href = response.url || '/auth/callback';
+          } else if (response.ok) {
+            const data = await response.text();
+            if (data.includes('kite.zerodha.com')) {
+              // Got login URL, redirect user
+              const parser = new DOMParser();
+              const doc = parser.parseFromString(data, 'text/html');
+              const metaRefresh = doc.querySelector('meta[http-equiv="refresh"]');
+              if (metaRefresh) {
+                const content = metaRefresh.getAttribute('content');
+                const url = content.split('url=')[1];
+                window.location.href = url;
+              }
+            } else {
+              kiteConnected = true;
+              updateConnectionStatus('kite', true);
+              alert('✅ Kite connected successfully!');
+            }
+          } else {
+            throw new Error('Connection failed with status: ' + response.status);
           }
         } catch (error) {
-          alert('Connection failed: ' + error.message);
+          console.error('Connection error:', error);
+          alert('❌ Connection failed. Please check your API credentials and try again.\n\nError: ' + error.message);
+        } finally {
+          connectBtn.textContent = originalText;
+          connectBtn.disabled = false;
         }
       }
       
@@ -539,6 +576,29 @@
         document.body.classList.toggle('light-theme');
         const btn = document.querySelector('.theme-toggle');
         btn.textContent = document.body.classList.contains('light-theme') ? '☀️' : '🌙';
+      }
+      
+      async function openKiteLogin() {
+        const apiKey = document.getElementById('kite-api-key').value.trim();
+        if (!apiKey) {
+          alert('Please enter API Key first');
+          return;
+        }
+        
+        try {
+          const response = await fetch(`/login_url?api_key=${encodeURIComponent(apiKey)}`);
+          const data = await response.json();
+          if (data.login_url) {
+            window.open(data.login_url, '_blank');
+            alert('✅ Kite login opened in new tab. After login, come back and proceed to next step.');
+            kiteConnected = true;
+            updateConnectionStatus('kite', true);
+          } else {
+            throw new Error(data.error || 'Failed to get login URL');
+          }
+        } catch (error) {
+          alert('❌ Error getting login URL: ' + error.message);
+        }
       }
       
       // Check connection status on load

@@ -429,33 +429,25 @@
           return;
         }
         
-        const connectBtn = document.querySelector('.btn.secondary');
-        const originalText = connectBtn.textContent;
-        connectBtn.textContent = '⏳ Connecting...';
-        connectBtn.disabled = true;
+        // Submit a standard POST form to /ui/login so the server can set HttpOnly cookies
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/ui/login';
         
-        try {
-          // Set cookies for the auth callback to use
-          document.cookie = `kite_api_key=${encodeURIComponent(apiKey)}; path=/; max-age=600; SameSite=Lax`;
-          document.cookie = `kite_api_secret=${encodeURIComponent(apiSecret)}; path=/; max-age=600; SameSite=Lax`;
-          
-          // Get login URL
-          const response = await fetch(`/login_url?api_key=${encodeURIComponent(apiKey)}`);
-          const data = await response.json();
-          
-          if (data.login_url) {
-            // Redirect to Kite login
-            window.location.href = data.login_url;
-          } else {
-            throw new Error(data.error || 'Failed to get login URL');
-          }
-        } catch (error) {
-          console.error('Connection error:', error);
-          alert('❌ Connection failed. Please check your API credentials and try again.\n\nError: ' + error.message);
-        } finally {
-          connectBtn.textContent = originalText;
-          connectBtn.disabled = false;
-        }
+        const keyInput = document.createElement('input');
+        keyInput.type = 'hidden';
+        keyInput.name = 'api_key';
+        keyInput.value = apiKey;
+        form.appendChild(keyInput);
+        
+        const secretInput = document.createElement('input');
+        secretInput.type = 'hidden';
+        secretInput.name = 'api_secret';
+        secretInput.value = apiSecret;
+        form.appendChild(secretInput);
+        
+        document.body.appendChild(form);
+        form.submit();
       }
       
       async function savePplxKey() {

@@ -103,6 +103,21 @@
         </section>
       </div>
 
+      <div class="grid-2" style="margin-top:16px">
+        <section class="card raise">
+          <h2>Perplexity</h2>
+          <form action="/ui/pplx_key" method="post" class="grid">
+            <label>Perplexity API Key
+              <input type="password" name="pplx_api_key" placeholder="PPLX_API_KEY" required />
+            </label>
+            <div style="align-self:end">
+              <button class="btn secondary" type="submit">Save Perplexity key</button>
+            </div>
+          </form>
+          <p>This stores the key in an HttpOnly cookie for this browser session.</p>
+        </section>
+      </div>
+
       <section id="howto" class="card">
         <h2>How it works</h2>
         <ol class="howto">

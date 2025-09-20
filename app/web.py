@@ -257,6 +257,22 @@ async def ui_backtest(request: Request, file: UploadFile = File(...), days: int 
         )
 
 
+# Perplexity API key via UI (stores in HttpOnly cookie)
+@app.post("/ui/pplx_key")
+async def ui_set_pplx_key(request: Request, pplx_api_key: str = Form(...)):
+    try:
+        key = (pplx_api_key or "").strip()
+        if not key:
+            raise ValueError("API key cannot be empty")
+        resp = RedirectResponse(url="/", status_code=303)
+        forwarded_proto = (request.headers.get("x-forwarded-proto") or "").split(",")[0].strip().lower()
+        cookie_secure = (request.url.scheme == "https") or (forwarded_proto == "https")
+        resp.set_cookie("pplx_api_key", key, max_age=12 * 60 * 60, httponly=True, secure=cookie_secure, samesite="lax")
+        return resp
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
 # --- AI Strategy generation via Perplexity ---
 @app.post("/ui/ai_strategy", response_class=HTMLResponse)
 async def ui_ai_strategy(
@@ -276,6 +292,13 @@ async def ui_ai_strategy(
     """
     try:
         pplx_key = os.environ.get("PPLX_API_KEY")
+        # Allow key via cookie for convenience
+        try:
+            cookie_key = (request.cookies.get("pplx_api_key") or "").strip()
+            if cookie_key:
+                pplx_key = pplx_key or cookie_key
+        except Exception:
+            pass
         if not pplx_key:
             raise RuntimeError("Missing PPLX_API_KEY in environment")
 

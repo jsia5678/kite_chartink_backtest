@@ -7,7 +7,7 @@ from typing import Optional
 import pandas as pd
 import pytz
 from fastapi import FastAPI, File, UploadFile, Form, Request
-from fastapi.responses import JSONResponse, StreamingResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import JSONResponse, StreamingResponse, HTMLResponse, RedirectResponse, PlainTextResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 
@@ -200,7 +200,24 @@ async def index(request: Request):
 
 
 @app.post("/ui/backtest", response_class=HTMLResponse)
-async def ui_backtest(request: Request, file: UploadFile = File(...), days: int = Form(...), exchange: str = Form("NSE"), tz: str = Form("Asia/Kolkata"), sl_pct: Optional[str] = Form(default=None), tp_pct: Optional[str] = Form(default=None), entry_time: Optional[str] = Form(default=None), entry_time2: Optional[str] = Form(default=None), entry_time3: Optional[str] = Form(default=None), cap_small: Optional[str] = Form(default=None), cap_mid: Optional[str] = Form(default=None), cap_large: Optional[str] = Form(default=None), cap_meta_csv: Optional[UploadFile] = File(default=None), breakeven_profit_pct: Optional[str] = Form(default=None), breakeven_at_sl: Optional[str] = Form(default=None)):
+async def ui_backtest(
+    request: Request,
+    file: UploadFile = File(...),
+    days: int = Form(...),
+    exchange: str = Form("NSE"),
+    tz: str = Form("Asia/Kolkata"),
+    sl_pct: Optional[str] = Form(default=None),
+    tp_pct: Optional[str] = Form(default=None),
+    entry_time: Optional[str] = Form(default=None),
+    entry_time2: Optional[str] = Form(default=None),
+    entry_time3: Optional[str] = Form(default=None),
+    cap_small: Optional[str] = Form(default=None),
+    cap_mid: Optional[str] = Form(default=None),
+    cap_large: Optional[str] = Form(default=None),
+    cap_meta_csv: Optional[UploadFile] = File(default=None),
+    breakeven_profit_pct: Optional[str] = Form(default=None),
+    breakeven_at_sl: Optional[str] = Form(default=None),
+):
     # Ensure required Kite credentials are available for engine via env
     try:
         cookie_api_key = (request.cookies.get("kite_api_key") or "").strip()
@@ -260,7 +277,24 @@ async def ui_backtest(request: Request, file: UploadFile = File(...), days: int 
         insights = compute_insights(df)
         return templates.TemplateResponse(
             "results.html",
-            {"request": request, "rows": records, "count": len(records), "stats": stats, "equity": equity, "insights": insights},
+            {
+                "request": request,
+                "rows": records,
+                "count": len(records),
+                "stats": stats,
+                "equity": equity,
+                "insights": insights,
+                "csv_path": tmp_path,
+                "defaults": {
+                    "days": days,
+                    "exchange": exchange,
+                    "tz": tz,
+                    "sl_pct": sl_pct,
+                    "tp_pct": tp_pct,
+                    "breakeven_profit_pct": breakeven_profit_pct,
+                    "breakeven_at_sl": bool(breakeven_at_sl),
+                },
+            },
         )
     except Exception as e:
         # Show error on the results page instead of 500
@@ -485,6 +519,19 @@ async def ui_ai_strategy(
                 "equity": equity,
                 "insights": insights,
                 "ai_prompt": prompt,
+                "csv_path": tmp_csv_path,
+                "defaults": {
+                    "days": days,
+                    "exchange": exchange,
+                    "tz": tz,
+                    "sl_pct": sl_pct,
+                    "tp_pct": tp_pct,
+                    "breakeven_profit_pct": breakeven_profit_pct,
+                    "breakeven_at_sl": bool(breakeven_at_sl),
+                    "timeframe": timeframe,
+                    "from_date": from_date,
+                    "to_date": to_date,
+                },
             },
         )
     except Exception as e:
@@ -494,3 +541,183 @@ async def ui_ai_strategy(
             status_code=400,
         )
 
+
+@app.post("/ui/rerun", response_class=HTMLResponse)
+async def ui_rerun(
+    request: Request,
+    csv_path: str = Form(...),
+    days: int = Form(...),
+    exchange: str = Form("NSE"),
+    tz: str = Form("Asia/Kolkata"),
+    sl_pct: Optional[str] = Form(default=None),
+    tp_pct: Optional[str] = Form(default=None),
+    cap_small: Optional[str] = Form(default=None),
+    cap_mid: Optional[str] = Form(default=None),
+    cap_large: Optional[str] = Form(default=None),
+    breakeven_profit_pct: Optional[str] = Form(default=None),
+    breakeven_at_sl: Optional[str] = Form(default=None),
+):
+    try:
+        allowed_caps = []
+        if cap_small:
+            allowed_caps.append("Small")
+        if cap_mid:
+            allowed_caps.append("Mid")
+        if cap_large:
+            allowed_caps.append("Large")
+        if not allowed_caps:
+            allowed_caps = ["Small", "Mid", "Large"]
+
+        df = run_backtest_from_csv(
+            csv_path=csv_path,
+            num_days=days,
+            exchange=exchange,
+            timezone_name=tz,
+            sl_pct=_to_opt_float(sl_pct),
+            tp_pct=_to_opt_float(tp_pct),
+            allowed_cap_buckets=allowed_caps or None,
+            breakeven_profit_pct=_to_opt_float(breakeven_profit_pct),
+            breakeven_at_sl=bool(breakeven_at_sl),
+        )
+        records = df.to_dict(orient="records")
+        equity, stats = compute_equity_and_stats(df)
+        insights = compute_insights(df)
+        return templates.TemplateResponse(
+            "results.html",
+            {
+                "request": request,
+                "rows": records,
+                "count": len(records),
+                "stats": stats,
+                "equity": equity,
+                "insights": insights,
+                "csv_path": csv_path,
+                "defaults": {
+                    "days": days,
+                    "exchange": exchange,
+                    "tz": tz,
+                    "sl_pct": sl_pct,
+                    "tp_pct": tp_pct,
+                    "breakeven_profit_pct": breakeven_profit_pct,
+                    "breakeven_at_sl": bool(breakeven_at_sl),
+                },
+            },
+        )
+    except Exception as e:
+        return templates.TemplateResponse(
+            "results.html",
+            {"request": request, "rows": [], "count": 0, "error": str(e), "csv_path": csv_path},
+            status_code=400,
+        )
+
+
+def _get_pplx_key_from_request(request: Request) -> str:
+    key = os.environ.get("PPLX_API_KEY", "").strip()
+    try:
+        cookie_key = (request.cookies.get("pplx_api_key") or "").strip()
+        if cookie_key:
+            key = key or cookie_key
+    except Exception:
+        pass
+    return key
+
+
+async def _pplx_chat(request: Request, messages: list[dict]) -> str:
+    pplx_key = _get_pplx_key_from_request(request)
+    if not pplx_key:
+        raise RuntimeError("Missing PPLX_API_KEY in environment or cookie")
+    payload = {
+        "model": os.environ.get("PPLX_MODEL", "sonar-pro"),
+        "messages": messages,
+        "temperature": 0.2,
+    }
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        resp = await client.post(
+            "https://api.perplexity.ai/chat/completions",
+            headers={
+                "Authorization": f"Bearer {pplx_key}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    content = ""
+    try:
+        choices = data.get("choices") or []
+        if choices:
+            content = (choices[0].get("message") or {}).get("content") or ""
+    except Exception:
+        content = ""
+    return content
+
+
+@app.post("/ui/ai_summary")
+async def ui_ai_summary(request: Request, json: str = Form(...)):
+    try:
+        # json is the backtest JSON payload as string
+        system = (
+            "You analyze trading backtests. Summarize performance in 4 short bullet points: "
+            "(1) headline win rate and return quality, (2) risk (max drawdown, volatility) "
+            "(3) drivers (cap buckets, entry times), (4) concrete next tests. Keep it under 80 words."
+        )
+        user = f"Backtest JSON:\n{json}"
+        content = await _pplx_chat(request, [{"role": "system", "content": system}, {"role": "user", "content": user}])
+        return PlainTextResponse(content)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
+@app.post("/ui/ai_chat")
+async def ui_ai_chat(request: Request, question: str = Form(...), json: str = Form(...)):
+    try:
+        system = (
+            "You are a helpful analyst. Answer the question using only the provided backtest JSON. "
+            "Be concise and propose at most 3 actionable re-run ideas (parameter changes)."
+        )
+        user = f"Question: {question}\n\nBacktest JSON:\n{json}"
+        content = await _pplx_chat(request, [{"role": "system", "content": system}, {"role": "user", "content": user}])
+        return PlainTextResponse(content)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
+@app.post("/ui/export_csv")
+async def ui_export_csv(
+    csv_path: str = Form(...),
+    days: int = Form(...),
+    exchange: str = Form("NSE"),
+    tz: str = Form("Asia/Kolkata"),
+    sl_pct: Optional[str] = Form(default=None),
+    tp_pct: Optional[str] = Form(default=None),
+    breakeven_profit_pct: Optional[str] = Form(default=None),
+    breakeven_at_sl: Optional[str] = Form(default=None),
+):
+    try:
+        df = run_backtest_from_csv(
+            csv_path=csv_path,
+            num_days=days,
+            exchange=exchange,
+            timezone_name=tz,
+            sl_pct=_to_opt_float(sl_pct),
+            tp_pct=_to_opt_float(tp_pct),
+            breakeven_profit_pct=_to_opt_float(breakeven_profit_pct),
+            breakeven_at_sl=bool(breakeven_at_sl),
+        )
+        csv_bytes = df.to_csv(index=False).encode("utf-8")
+        return StreamingResponse(io.BytesIO(csv_bytes), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=backtest.csv"})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
+@app.post("/ui/export_notes")
+async def ui_export_notes(request: Request, json: str = Form(...)):
+    try:
+        system = (
+            "Write a brief backtest note: Summary, Risks, Suggested Improvements. 120-200 words."
+        )
+        user = f"Backtest JSON:\n{json}"
+        content = await _pplx_chat(request, [{"role": "system", "content": system}, {"role": "user", "content": user}])
+        return StreamingResponse(io.BytesIO(content.encode("utf-8")), media_type="text/plain", headers={"Content-Disposition": "attachment; filename=ai_notes.txt"})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)

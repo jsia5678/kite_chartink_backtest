@@ -293,6 +293,12 @@ input::placeholder {
   color: var(--text-primary);
 }
 
+/* KPI color cues */
+.kpi { border-color: var(--border); }
+.kpi.kpi-good { border-color: #15803d; box-shadow: 0 0 0 1px rgba(34,197,94,0.4) inset; }
+.kpi.kpi-warn { border-color: #a16207; box-shadow: 0 0 0 1px rgba(245,158,11,0.4) inset; }
+.kpi.kpi-bad { border-color: #7f1d1d; box-shadow: 0 0 0 1px rgba(239,68,68,0.4) inset; }
+
 /* Tables */
 .table-wrap {
   overflow-x: auto;
@@ -341,6 +347,46 @@ tr:hover {
   margin: 16px 0;
   font-weight: 500;
 }
+
+/* Results layout */
+.layout-2col {
+  display: grid;
+  grid-template-columns: 280px 1fr 320px;
+  gap: 24px;
+  align-items: start;
+}
+
+.sidebar { position: sticky; top: 88px; }
+
+.assistant-panel {
+  position: sticky;
+  top: 88px;
+  height: calc(100vh - 120px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 12px;
+  overflow: hidden;
+}
+
+.assistant-panel.collapsed { width: 48px; padding: 8px; }
+.assistant-panel.collapsed #assistant-body { display: none; }
+
+.assistant-header { display:flex; align-items:center; justify-content: space-between; margin-bottom: 8px; }
+.assistant-messages { height: calc(100% - 90px); overflow: auto; padding: 8px; border: 1px dashed var(--border); border-radius: var(--radius-md); }
+.msg { padding: 8px 10px; margin: 6px 0; border-radius: 8px; font-size: 14px; }
+.msg-user { background: rgba(59,130,246,0.15); }
+.msg-ai { background: rgba(34,197,94,0.15); }
+
+#assistant-form { display:flex; gap: 8px; margin-top: 8px; }
+#assistant-form input { flex:1; }
+
+/* Tabs */
+.tabs { display:flex; gap: 8px; margin: 12px 0 8px; }
+.tab-btn { background: var(--bg-tertiary); color: var(--text-secondary); border: 1px solid var(--border); padding: 8px 12px; border-radius: 8px; cursor:pointer; }
+.tab-btn.active { background: var(--accent-blue); color: white; }
+.tab-panel { display:none; }
+.tab-panel.active { display:block; }
 
 /* Checkboxes */
 input[type="checkbox"] {
@@ -414,6 +460,9 @@ a:hover {
     padding: 0 16px;
   }
   
+  .layout-2col { grid-template-columns: 1fr; }
+  .assistant-panel { position: relative; height: auto; }
+
   .hero {
     padding: 40px 0 24px;
   }

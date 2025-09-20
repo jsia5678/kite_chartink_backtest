@@ -373,7 +373,7 @@
         var btJson = document.getElementById('backtest-json').textContent;
         async function aiSummary(){
           try{
-            var fd = new FormData(); fd.append('json', btJson);
+            var fd = new FormData(); fd.append('bt_json', btJson);
             var r = await fetch('/ui/ai_summary', { method: 'POST', body: fd });
             var t = await r.text();
             document.getElementById('ai-summary-text').textContent = t;
@@ -390,7 +390,7 @@
         }
         form.addEventListener('submit', async function(e){
           e.preventDefault(); var q = input.value.trim(); if(!q) return; addMsg(q,'user'); input.value='';
-          try{ var fd = new FormData(); fd.append('question', q); fd.append('json', btJson); var r = await fetch('/ui/ai_chat', { method:'POST', body: fd }); var t = await r.text(); addMsg(t,'ai'); }catch(e){ addMsg('AI unavailable','ai'); }
+          try{ var fd = new FormData(); fd.append('question', q); fd.append('bt_json', btJson); var r = await fetch('/ui/ai_chat', { method:'POST', body: fd }); var t = await r.text(); addMsg(t,'ai'); }catch(e){ addMsg('AI unavailable','ai'); }
         });
       })();
 
@@ -402,7 +402,7 @@
           var f = new FormData(document.getElementById('rerun-form'));
           fetch('/ui/export_csv', { method:'POST', body: f }).then(function(r){ return r.blob(); }).then(function(b){ var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'backtest.csv'; a.click(); });
         }); }
-        if(btnNotes){ btnNotes.addEventListener('click', function(){ var f = new FormData(); f.append('json', document.getElementById('backtest-json').textContent); fetch('/ui/export_notes', { method:'POST', body: f }).then(function(r){ return r.blob(); }).then(function(b){ var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'ai_notes.txt'; a.click(); }); }); }
+        if(btnNotes){ btnNotes.addEventListener('click', function(){ var f = new FormData(); f.append('bt_json', document.getElementById('backtest-json').textContent); fetch('/ui/export_notes', { method:'POST', body: f }).then(function(r){ return r.blob(); }).then(function(b){ var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'ai_notes.txt'; a.click(); }); }); }
       })();
   </script>
   </body>

@@ -681,7 +681,7 @@ async def _pplx_chat(request: Request, messages: list[dict]) -> str:
 
 
 @app.post("/ui/ai_summary")
-async def ui_ai_summary(request: Request, json: str = Form(...)):
+async def ui_ai_summary(request: Request, bt_json: str = Form(...)):
     try:
         # json is the backtest JSON payload as string
         system = (
@@ -689,7 +689,7 @@ async def ui_ai_summary(request: Request, json: str = Form(...)):
             "(1) headline win rate and return quality, (2) risk (max drawdown, volatility) "
             "(3) drivers (cap buckets, entry times), (4) concrete next tests. Keep it under 80 words."
         )
-        user = f"Backtest JSON:\n{json}"
+        user = f"Backtest JSON:\n{bt_json}"
         content = await _pplx_chat(request, [{"role": "system", "content": system}, {"role": "user", "content": user}])
         return PlainTextResponse(content)
     except Exception as e:
@@ -697,13 +697,13 @@ async def ui_ai_summary(request: Request, json: str = Form(...)):
 
 
 @app.post("/ui/ai_chat")
-async def ui_ai_chat(request: Request, question: str = Form(...), json: str = Form(...)):
+async def ui_ai_chat(request: Request, question: str = Form(...), bt_json: str = Form(...)):
     try:
         system = (
             "You are a helpful analyst. Answer the question using only the provided backtest JSON. "
             "Be concise and propose at most 3 actionable re-run ideas (parameter changes)."
         )
-        user = f"Question: {question}\n\nBacktest JSON:\n{json}"
+        user = f"Question: {question}\n\nBacktest JSON:\n{bt_json}"
         content = await _pplx_chat(request, [{"role": "system", "content": system}, {"role": "user", "content": user}])
         return PlainTextResponse(content)
     except Exception as e:
@@ -739,12 +739,12 @@ async def ui_export_csv(
 
 
 @app.post("/ui/export_notes")
-async def ui_export_notes(request: Request, json: str = Form(...)):
+async def ui_export_notes(request: Request, bt_json: str = Form(...)):
     try:
         system = (
             "Write a brief backtest note: Summary, Risks, Suggested Improvements. 120-200 words."
         )
-        user = f"Backtest JSON:\n{json}"
+        user = f"Backtest JSON:\n{bt_json}"
         content = await _pplx_chat(request, [{"role": "system", "content": system}, {"role": "user", "content": user}])
         return StreamingResponse(io.BytesIO(content.encode("utf-8")), media_type="text/plain", headers={"Content-Disposition": "attachment; filename=ai_notes.txt"})
     except Exception as e:

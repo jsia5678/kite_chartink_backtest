@@ -38,7 +38,16 @@ def parse_chartink_csv(csv_path: str, tz: pytz.BaseTzInfo) -> List[BacktestInput
 
         # If we have an explicit time column, parse separately
         if col_map["entry_time"] is not None:
-            date_val = pd.to_datetime(str(date_raw), dayfirst=True).date()
+            # Prefer ISO parsing first to avoid dayfirst warnings, then fall back
+            s = str(date_raw).strip()
+            date_val = None
+            try:
+                if len(s) == 10 and s[4] == '-' and s[7] == '-':
+                    date_val = dt.datetime.strptime(s, "%Y-%m-%d").date()
+            except Exception:
+                date_val = None
+            if date_val is None:
+                date_val = pd.to_datetime(s, dayfirst=True).date()
             time_str = str(rec[col_map["entry_time"]]).strip()
             # Handle HH:MM or HH:MM:SS
             try:

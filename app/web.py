@@ -12,6 +12,8 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 
 from .engine import run_backtest_from_csv, compute_equity_and_stats, compute_insights
+import httpx
+import json as _json
 from .kite_service import KiteService
 
 app = FastAPI(title="Kite Chartink Backtester")
@@ -254,4 +256,115 @@ async def ui_backtest(request: Request, file: UploadFile = File(...), days: int 
             status_code=400,
         )
 
+
+# --- AI Strategy generation via Perplexity ---
+@app.post("/ui/ai_strategy", response_class=HTMLResponse)
+async def ui_ai_strategy(
+    request: Request,
+    prompt: str = Form(...),
+    days: int = Form(...),
+    exchange: str = Form("NSE"),
+    tz: str = Form("Asia/Kolkata"),
+    sl_pct: Optional[str] = Form(default=None),
+    tp_pct: Optional[str] = Form(default=None),
+    breakeven_profit_pct: Optional[str] = Form(default=None),
+    breakeven_at_sl: Optional[str] = Form(default=None),
+):
+    """
+    Uses Perplexity API (API key from PPLX_API_KEY) to turn a natural-language strategy prompt
+    into a CSV of entries with columns: stock, entry_date, entry_time. The CSV is then backtested.
+    """
+    try:
+        pplx_key = os.environ.get("PPLX_API_KEY")
+        if not pplx_key:
+            raise RuntimeError("Missing PPLX_API_KEY in environment")
+
+        system_instructions = (
+            "You are a trading assistant. Given a user strategy idea, output a CSV ONLY with columns "
+            "stock,entry_date,entry_time for Indian equities (NSE), with past historical realistic entries. "
+            "Use format: stock as tradingsymbol (e.g., TCS, RELIANCE), entry_date as YYYY-MM-DD, entry_time as HH:MM (24h). "
+            "Output at least 25 rows spanning multiple dates. Do not include any commentary, only CSV rows with a header."
+        )
+
+        payload = {
+            "model": os.environ.get("PPLX_MODEL", "sonar-pro"),
+            "messages": [
+                {"role": "system", "content": system_instructions},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.2,
+        }
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(
+                "https://api.perplexity.ai/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {pplx_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+
+        # Extract text content
+        content = ""
+        try:
+            choices = data.get("choices") or []
+            if choices:
+                content = (choices[0].get("message") or {}).get("content") or ""
+        except Exception:
+            content = ""
+
+        if not content:
+            raise RuntimeError("Empty response from Perplexity")
+
+        # Clean fenced code blocks if present
+        if "```" in content:
+            parts = content.split("```")
+            # Prefer the first fenced block that looks like CSV
+            csv_text = None
+            for i in range(1, len(parts), 2):
+                block = parts[i]
+                if "," in block and ("stock" in block.lower() or "entry_date" in block.lower()):
+                    csv_text = block
+                    break
+            content = csv_text or content
+
+        # Persist CSV to temp and run backtest
+        tmp_csv_path = "/tmp/ai_strategy.csv"
+        with open(tmp_csv_path, "w", encoding="utf-8") as f:
+            f.write(content.strip())
+
+        df = run_backtest_from_csv(
+            csv_path=tmp_csv_path,
+            num_days=days,
+            exchange=exchange,
+            timezone_name=tz,
+            sl_pct=_to_opt_float(sl_pct),
+            tp_pct=_to_opt_float(tp_pct),
+            breakeven_profit_pct=_to_opt_float(breakeven_profit_pct),
+            breakeven_at_sl=bool(breakeven_at_sl),
+        )
+        records = df.to_dict(orient="records")
+        equity, stats = compute_equity_and_stats(df)
+        insights = compute_insights(df)
+        return templates.TemplateResponse(
+            "results.html",
+            {
+                "request": request,
+                "rows": records,
+                "count": len(records),
+                "stats": stats,
+                "equity": equity,
+                "insights": insights,
+                "ai_prompt": prompt,
+            },
+        )
+    except Exception as e:
+        return templates.TemplateResponse(
+            "results.html",
+            {"request": request, "rows": [], "count": 0, "error": str(e)},
+            status_code=400,
+        )
 

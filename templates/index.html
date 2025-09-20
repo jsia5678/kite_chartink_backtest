@@ -54,6 +54,38 @@
           <button class="btn primary" type="submit">Run backtest</button>
         </form>
 
+        <form action="/ui/ai_strategy" method="post" class="card raise">
+          <h2>AI Strategy (Perplexity)</h2>
+          <label>Describe your strategy idea
+            <textarea name="prompt" rows="6" placeholder="e.g., Momentum strategy: Buy large-cap stocks making new 20-day highs with strong volume, entries after 09:45 IST on breakout days in the last 3 months." required></textarea>
+          </label>
+          <div class="grid">
+            <label>Days (N)
+              <input type="number" name="days" value="{{ default_days }}" min="1" required />
+            </label>
+            <label>Exchange
+              <input type="text" name="exchange" value="{{ default_exchange }}" />
+            </label>
+            <label>Timezone
+              <input type="text" name="tz" value="{{ default_tz }}" />
+            </label>
+            <label>SL % (optional)
+              <input type="number" name="sl_pct" step="0.01" placeholder="e.g. 2.0" />
+            </label>
+            <label>TP % (optional)
+              <input type="number" name="tp_pct" step="0.01" placeholder="e.g. 4.0" />
+            </label>
+            <label>Breakeven at profit %
+              <input type="number" name="breakeven_profit_pct" step="0.01" placeholder="e.g. 1.0" />
+            </label>
+            <label style="align-self:end">
+              <input type="checkbox" name="breakeven_at_sl" value="1" /> Breakeven when profit ≥ SL %
+            </label>
+          </div>
+          <div class="hint">AI will synthesize a CSV of historical entries based on your idea and run the backtest.</div>
+          <button class="btn primary" type="submit">Generate and backtest</button>
+        </form>
+
         <section class="card raise">
           <h2>Auth</h2>
           <form action="/ui/login" method="post" class="grid">

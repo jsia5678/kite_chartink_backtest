@@ -15,6 +15,9 @@
     </header>
     <main class="container">
       <h1>Results ({{ count }})</h1>
+      {% if ai_prompt %}
+      <div class="banner">AI Strategy prompt used: <em>{{ ai_prompt }}</em></div>
+      {% endif %}
       {% if stats %}
       <section class="metrics">
         <div class="metric"><div class="k">Trades</div><div class="v">{{ '%.0f'|format(stats['trades']) }}</div></div>

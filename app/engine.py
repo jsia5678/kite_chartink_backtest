@@ -22,6 +22,7 @@ def compute_entry_exit_for_row(
     tp_pct: Optional[float] = None,
     breakeven_profit_pct: Optional[float] = None,
     breakeven_at_sl: bool = False,
+    intraday_interval: str = "15minute",
 ) -> dict:
     # Build localized entry timestamp
     entry_dt_local = tz.localize(dt.datetime.combine(row.entry_date, row.entry_time))
@@ -29,18 +30,18 @@ def compute_entry_exit_for_row(
     # Get instrument token
     token = kite.resolve_instrument_token(symbol=row.stock, exchange=exchange)
 
-    # 15m candles around entry date to price at/just before entry
+    # Intraday candles around entry date to price at/just before entry
     start = entry_dt_local - dt.timedelta(days=5)
     end = entry_dt_local + dt.timedelta(days=1)
-    candles_15m = kite.fetch_ohlc(token=token, interval="15minute", start=start, end=end, tz=tz)
-    if candles_15m.empty:
-        raise ValueError(f"No 15m data for {row.stock} around {entry_dt_local}")
+    candles_intraday = kite.fetch_ohlc(token=token, interval=intraday_interval, start=start, end=end, tz=tz)
+    if candles_intraday.empty:
+        raise ValueError(f"No {intraday_interval} data for {row.stock} around {entry_dt_local}")
 
-    # Find nearest earlier candle at or before entry time (15m)
-    entry_ts = nearest_prior_timestamp(candles_15m.index, entry_dt_local)
+    # Find nearest earlier candle at or before entry time
+    entry_ts = nearest_prior_timestamp(candles_intraday.index, entry_dt_local)
     if entry_ts is None:
         raise ValueError(f"No prior candle for {row.stock} at {entry_dt_local}")
-    entry_price = float(candles_15m.loc[entry_ts, "close"]) if "close" in candles_15m.columns else float(candles_15m.loc[entry_ts, "ohlc"]["close"])  # type: ignore
+    entry_price = float(candles_intraday.loc[entry_ts, "close"]) if "close" in candles_intraday.columns else float(candles_intraday.loc[entry_ts, "ohlc"]["close"])  # type: ignore
 
     # Scheduled exit date after N trading days
     exit_trade_date = trading_days_ahead(entry_dt_local.date(), num_days)
@@ -51,7 +52,7 @@ def compute_entry_exit_for_row(
     exit_price: Optional[float] = None
     exit_time_str = "15:30"
 
-    # If SL/TP provided, scan intraday candles from entry onward USING 15-MIN CLOSES
+    # If SL/TP provided, scan intraday candles from entry onward using intraday_interval CLOSES
     if (sl_pct is not None and sl_pct > 0) or (tp_pct is not None and tp_pct > 0) or (breakeven_profit_pct is not None) or breakeven_at_sl:
         target_price = entry_price * (1.0 + (tp_pct or 0.0) / 100.0) if tp_pct else None
         base_stop_price = entry_price * (1.0 - (sl_pct or 0.0) / 100.0) if sl_pct else None
@@ -60,7 +61,7 @@ def compute_entry_exit_for_row(
 
         scan_start = entry_ts
         scan_end = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(15, 30)))
-        intraday = kite.fetch_ohlc(token=token, interval="15minute", start=scan_start, end=scan_end, tz=tz)
+        intraday = kite.fetch_ohlc(token=token, interval=intraday_interval, start=scan_start, end=scan_end, tz=tz)
         if not intraday.empty:
             intraday = intraday[intraday.index > entry_ts]
             for ts, row_c in intraday.iterrows():
@@ -91,11 +92,11 @@ def compute_entry_exit_for_row(
                     exit_ts = ts
                     break
 
-    # If neither SL nor TP triggered, exit at last 15m close on the Nth trading day
+    # If neither SL nor TP triggered, exit at last intraday close on the Nth trading day
     if exit_price is None:
         day_start = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(9, 0)))
         day_end = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(15, 30)))
-        intraday_exit = kite.fetch_ohlc(token=token, interval="15minute", start=day_start, end=day_end, tz=tz)
+        intraday_exit = kite.fetch_ohlc(token=token, interval=intraday_interval, start=day_start, end=day_end, tz=tz)
         if not intraday_exit.empty:
             exit_ts = intraday_exit.index[-1]
             exit_price = float(intraday_exit.iloc[-1]["close"])  # type: ignore

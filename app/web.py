@@ -15,6 +15,7 @@ from .engine import run_backtest_from_csv, compute_equity_and_stats, compute_ins
 import httpx
 import json as _json
 from .kite_service import KiteService
+from .utils import parse_chartink_csv, compute_entry_exit_for_row
 
 app = FastAPI(title="Kite Chartink Backtester")
 templates = Jinja2Templates(directory="templates")
@@ -285,6 +286,9 @@ async def ui_ai_strategy(
     tp_pct: Optional[str] = Form(default=None),
     breakeven_profit_pct: Optional[str] = Form(default=None),
     breakeven_at_sl: Optional[str] = Form(default=None),
+    timeframe: Optional[str] = Form(default=None),
+    from_date: Optional[str] = Form(default=None),
+    to_date: Optional[str] = Form(default=None),
 ):
     """
     Uses Perplexity API (API key from PPLX_API_KEY) to turn a natural-language strategy prompt
@@ -313,13 +317,46 @@ async def ui_ai_strategy(
         if not pplx_key:
             raise RuntimeError("Missing PPLX_API_KEY in environment")
 
+        # Determine intraday interval from timeframe hint (default 15minute)
+        tf_map = {
+            "1m": "minute",
+            "1min": "minute",
+            "5m": "5minute",
+            "5min": "5minute",
+            "10m": "10minute",
+            "15m": "15minute",
+            "15min": "15minute",
+            "30m": "30minute",
+            "30min": "30minute",
+            "60m": "60minute",
+            "1h": "60minute",
+            "hour": "60minute",
+        }
+        intraday_interval = "15minute"
+        if timeframe:
+            key = timeframe.strip().lower()
+            intraday_interval = tf_map.get(key, intraday_interval)
+        else:
+            # Try to infer from prompt keywords
+            pl = (prompt or "").lower()
+            for k, v in tf_map.items():
+                if k in pl:
+                    intraday_interval = v
+                    break
+
+        # Enhance system instructions with optional date range
+        date_hint = ""
+        if from_date and to_date:
+            date_hint = f" Limit entries to dates between {from_date} and {to_date}."
+
         system_instructions = (
             "You are a trading assistant. Given a user strategy idea, output a CSV ONLY with columns "
-            "stock,entry_date,entry_time for Indian equities (NSE), with past historical realistic entries. "
-            "Use format: stock as tradingsymbol (e.g., TCS, RELIANCE), entry_date as YYYY-MM-DD, entry_time as HH:MM (24h). "
-            "Output at least 25 rows spanning multiple dates. Do not include any commentary, only CSV rows with a header."
+            "stock,entry_date,entry_time for Indian equities (NSE), with past historical realistic entries." 
+            " Use format: stock as tradingsymbol (e.g., TCS, RELIANCE), entry_date as YYYY-MM-DD, entry_time as HH:MM (24h)." 
+            " Output at least 25 rows spanning multiple dates. Do not include any commentary, only CSV rows with a header." 
+            + date_hint
         )
-
+        
         payload = {
             "model": os.environ.get("PPLX_MODEL", "sonar-pro"),
             "messages": [
@@ -380,6 +417,48 @@ async def ui_ai_strategy(
             breakeven_profit_pct=_to_opt_float(breakeven_profit_pct),
             breakeven_at_sl=bool(breakeven_at_sl),
         )
+        # Re-compute with chosen intraday interval by applying row-wise if intraday_interval differs from default
+        # Note: run_backtest_from_csv uses compute_entry_exit_for_row; we need a version that passes intraday_interval.
+        try:
+            # Lightweight re-run using the same parsed rows by re-reading CSV through engine utils is acceptable here.
+            import pytz as _pytz
+            rows = parse_chartink_csv(tmp_csv_path, tz=_pytz.timezone(tz))
+            kite = KiteService.from_env()
+            out = []
+            for r in rows:
+                try:
+                    out.append(
+                        compute_entry_exit_for_row(
+                            kite=kite,
+                            row=r,
+                            num_days=days,
+                            exchange=exchange,
+                            tz=_pytz.timezone(tz),
+                            sl_pct=_to_opt_float(sl_pct),
+                            tp_pct=_to_opt_float(tp_pct),
+                            breakeven_profit_pct=_to_opt_float(breakeven_profit_pct),
+                            breakeven_at_sl=bool(breakeven_at_sl),
+                            intraday_interval=intraday_interval,
+                        )
+                    )
+                except Exception as ee:
+                    out.append({
+                        "Stock": r.stock,
+                        "Entry Date": r.entry_date.isoformat(),
+                        "Entry Time": r.entry_time.strftime("%H:%M"),
+                        "Entry Price": None,
+                        "Exit Date": None,
+                        "Exit Time": None,
+                        "Exit Price": None,
+                        "Return %": None,
+                        "Exit Reason": None,
+                        "Error": str(ee),
+                    })
+            import pandas as _pd
+            df = _pd.DataFrame(out)
+        except Exception:
+            pass
+        
         records = df.to_dict(orient="records")
         equity, stats = compute_equity_and_stats(df)
         insights = compute_insights(df)

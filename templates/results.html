@@ -109,6 +109,14 @@
           <div class="k">Trades</div>
           <div class="v">{{ '%.0f'|format(stats['trades']) }}</div>
         </div>
+        {% if audit_summary %}
+        <div class="metric kpi primary-kpi pass-rate-kpi" data-kpi="pass-rate">
+          <div class="k">Pass Rate</div>
+          <div class="v pass-rate-{{ 'good' if audit_summary.pass_rate >= 80 else 'warn' if audit_summary.pass_rate >= 60 else 'bad' }}">
+            {{ '%.1f'|format(audit_summary.pass_rate) }}%
+          </div>
+        </div>
+        {% endif %}
         <div class="metric kpi primary-kpi" data-kpi="win">
           <div class="k">Win Rate</div>
           <div class="v">{{ '%.1f'|format(stats['win_rate_pct']) }}%</div>
@@ -143,10 +151,10 @@
         <div class="card">
           <div class="audit-header">
             <h3>🔍 Trade Audit Summary</h3>
-            <div class="audit-pass-rate">
-              <span class="pass-rate-label">Pass Rate</span>
-              <span class="pass-rate-value pass-rate-{{ 'good' if audit_summary.pass_rate >= 80 else 'warn' if audit_summary.pass_rate >= 60 else 'bad' }}">
-                {{ '%.1f'|format(audit_summary.pass_rate) }}%
+            <div class="audit-status">
+              <span class="audit-status-label">Audit Status</span>
+              <span class="audit-status-value audit-{{ 'good' if audit_summary.pass_rate >= 80 else 'warn' if audit_summary.pass_rate >= 60 else 'bad' }}">
+                {{ 'Compliant' if audit_summary.pass_rate >= 80 else 'Needs Review' if audit_summary.pass_rate >= 60 else 'Critical Issues' }}
               </span>
             </div>
           </div>
@@ -200,10 +208,16 @@
                   <button class="chart-toggle" data-view="per-trade">Per Trade</button>
                 </div>
               </div>
-              <canvas id="equityChart" height="200"></canvas>
+              <div class="chart-container">
+                <canvas id="equityChart" height="300"></canvas>
+                <div class="chart-labels">
+                  <div class="y-axis-label">Equity Value</div>
+                  <div class="x-axis-label">Trade Number</div>
+                </div>
+              </div>
               <div class="chart-footer">
                 <div class="chart-stats">
-                  <span class="chart-stat">Start: 100</span>
+                  <span class="chart-stat">Start: <span id="equity-start">100</span></span>
                   <span class="chart-stat">End: <span id="equity-end">100</span></span>
                   <span class="chart-stat">Peak: <span id="equity-peak">100</span></span>
                   <span class="chart-stat">Trough: <span id="equity-trough">100</span></span>
@@ -364,10 +378,18 @@
                 <span class="insight-icon">📊</span>
                 <span class="insight-text">Max drawdown: <span id="insight-drawdown">loading...</span>%</span>
               </div>
+              <div class="insight-item">
+                <span class="insight-icon">🎯</span>
+                <span class="insight-text">Pass rate: <span id="insight-pass-rate">loading...</span>%</span>
+              </div>
+              <div class="insight-item">
+                <span class="insight-icon">📈</span>
+                <span class="insight-text">Total return: <span id="insight-return">loading...</span>%</span>
+              </div>
             </div>
             
             <div class="suggested-prompts">
-              <div class="prompts-header">Suggested Questions:</div>
+              <div class="prompts-header">Quick Actions:</div>
               <div class="prompt-chips">
                 <button class="prompt-chip" data-prompt="What are the main risks in this strategy?">Risks</button>
                 <button class="prompt-chip" data-prompt="Which cap buckets perform best?">Cap Analysis</button>
@@ -376,6 +398,11 @@
                 <button class="prompt-chip" data-prompt="Show me the best entry times">Entry Timing</button>
                 <button class="prompt-chip" data-prompt="Explain the audit violations">Audit Issues</button>
               </div>
+            </div>
+            
+            <div class="assistant-actions">
+              <button class="action-btn" onclick="exportResults()">📊 Export Results</button>
+              <button class="action-btn" onclick="shareResults()">🔗 Share Analysis</button>
             </div>
             
             <div class="assistant-messages" id="assistant-messages"></div>
@@ -423,7 +450,7 @@
         }catch(e){}
       })();
 
-      // Equity chart
+      // Enhanced Equity chart with dynamic stats
     (function(){
       try{
         var el = document.getElementById('equity-data');
@@ -432,10 +459,79 @@
         if(!data.length) return;
         var ctx = document.getElementById('equityChart');
         var labels = data.map(function(_, i){ return i + 1; });
+        
+        // Calculate dynamic stats
+        var startValue = data[0] || 100;
+        var endValue = data[data.length - 1] || 100;
+        var peakValue = Math.max(...data);
+        var troughValue = Math.min(...data);
+        
+        // Update chart stats
+        document.getElementById('equity-start').textContent = startValue.toFixed(0);
+        document.getElementById('equity-end').textContent = endValue.toFixed(0);
+        document.getElementById('equity-peak').textContent = peakValue.toFixed(0);
+        document.getElementById('equity-trough').textContent = troughValue.toFixed(0);
+        
+        // Create win/loss markers
+        var winLossMarkers = data.map(function(value, index) {
+          if (index === 0) return null;
+          var prevValue = data[index - 1];
+          return {
+            x: index + 1,
+            y: value,
+            color: value >= prevValue ? '#10b981' : '#ef4444',
+            radius: 3
+          };
+        }).filter(Boolean);
+        
         new Chart(ctx, {
           type: 'line',
-          data: { labels: labels, datasets: [{ label: 'Equity (Base=100)', data: data, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.15)', tension: 0.2, fill: true, pointRadius: 0 }]},
-          options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { grid: { color: 'rgba(255,255,255,0.06)' } }, y: { grid: { color: 'rgba(255,255,255,0.06)' } } } }
+          data: { 
+            labels: labels, 
+            datasets: [
+              { 
+                label: 'Equity (Base=100)', 
+                data: data, 
+                borderColor: '#22c55e', 
+                backgroundColor: 'rgba(34,197,94,0.15)', 
+                tension: 0.2, 
+                fill: true, 
+                pointRadius: 0,
+                pointHoverRadius: 6
+              }
+            ]
+          },
+          options: { 
+            responsive: true, 
+            maintainAspectRatio: false,
+            plugins: { 
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  title: function(context) {
+                    return 'Trade #' + context[0].label;
+                  },
+                  label: function(context) {
+                    return 'Equity: ' + context.parsed.y.toFixed(2);
+                  }
+                }
+              }
+            }, 
+            scales: { 
+              x: { 
+                title: { display: true, text: 'Trade Number', color: '#9ca3af' },
+                grid: { color: 'rgba(255,255,255,0.06)' } 
+              }, 
+              y: { 
+                title: { display: true, text: 'Equity Value', color: '#9ca3af' },
+                grid: { color: 'rgba(255,255,255,0.06)' } 
+              } 
+            },
+            interaction: {
+              intersect: false,
+              mode: 'index'
+            }
+          }
         });
       } catch(e) {}
     })();
@@ -726,8 +822,12 @@
         // Update insights with actual data
         try {
           var stats = JSON.parse(document.getElementById('backtest-json').textContent).stats || {};
+          var auditSummary = JSON.parse(document.getElementById('backtest-json').textContent).audit_summary || {};
+          
           document.getElementById('insight-win-rate').textContent = (stats.win_rate_pct || 0).toFixed(1);
           document.getElementById('insight-drawdown').textContent = (stats.max_drawdown_pct || 0).toFixed(1);
+          document.getElementById('insight-pass-rate').textContent = (auditSummary.pass_rate || 0).toFixed(1);
+          document.getElementById('insight-return').textContent = (stats.get('compounded_return_pct', stats['total_return_pct']) || 0).toFixed(1);
         } catch(e) {}
         
         // Prompt chips
@@ -738,6 +838,18 @@
             document.getElementById('assistant-input').focus();
           });
         });
+        
+        // Action buttons
+        window.exportResults = function() {
+          document.getElementById('export-csv').click();
+        };
+        
+        window.shareResults = function() {
+          // Copy results URL to clipboard
+          navigator.clipboard.writeText(window.location.href).then(function() {
+            alert('Results URL copied to clipboard!');
+          });
+        };
       })();
   </script>
   </body>

@@ -21,7 +21,25 @@
       {% endif %}
 
       {% if ai_prompt %}
-      <div class="banner">AI Strategy prompt used: <em>{{ ai_prompt }}</em></div>
+      <div class="strategy-prompt-section">
+        <button class="strategy-toggle" onclick="toggleStrategy()">
+          <span class="strategy-icon">📋</span>
+          <span class="strategy-title">Strategy Rules</span>
+          <span class="toggle-icon">▼</span>
+        </button>
+        <div class="strategy-panel" id="strategy-panel" style="display: none;">
+          <div class="strategy-content">
+            <div class="strategy-text">{{ ai_prompt }}</div>
+            <div class="strategy-tags">
+              <span class="strategy-tag">⏱ 5m timeframe</span>
+              <span class="strategy-tag">📈 20-period SMA</span>
+              <span class="strategy-tag">🔊 Volume >1.5x</span>
+              <span class="strategy-tag">🔴 Bullish confirmation</span>
+              <span class="strategy-tag">🎯 BTST entries</span>
+            </div>
+          </div>
+        </div>
+      </div>
       {% endif %}
       {% if defaults and (defaults.from_date or defaults.to_date) %}
       <div class="banner" style="opacity:0.85">Date filter applied: {{ defaults.from_date or '...' }} → {{ defaults.to_date or '...' }}</div>
@@ -86,54 +104,111 @@
           <section class="tab-panel active" id="tab-overview">
       {% if stats %}
       <section class="metrics">
-              <div class="metric kpi" data-kpi="trades"><div class="k">Trades</div><div class="v">{{ '%.0f'|format(stats['trades']) }}</div></div>
-              <div class="metric kpi" data-kpi="win"><div class="k">Win rate</div><div class="v">{{ '%.2f'|format(stats['win_rate_pct']) }}%</div></div>
-              <div class="metric kpi" data-kpi="return"><div class="k">Compounded return</div><div class="v">{{ '%.2f'|format(stats.get('compounded_return_pct', stats['total_return_pct'])) }}%</div></div>
-              <div class="metric kpi" data-kpi="drawdown"><div class="k">Max DD</div><div class="v">{{ '%.2f'|format(stats['max_drawdown_pct']) }}%</div></div>
-        <div class="metric"><div class="k">R:R</div><div class="v">{{ '%.2f'|format(stats['risk_reward']) }}</div></div>
-              <div class="metric"><div class="k">Expectancy</div><div class="v">{{ '%.2f'|format(stats['expectancy_pct']) }}%</div></div>
-              <div class="metric"><div class="k">Calmar</div><div class="v">{{ '%.2f'|format(stats['calmar_ratio']) }}</div></div>
+        <!-- Primary KPIs - Consistent order and styling -->
+        <div class="metric kpi primary-kpi" data-kpi="trades">
+          <div class="k">Trades</div>
+          <div class="v">{{ '%.0f'|format(stats['trades']) }}</div>
+        </div>
+        <div class="metric kpi primary-kpi" data-kpi="win">
+          <div class="k">Win Rate</div>
+          <div class="v">{{ '%.1f'|format(stats['win_rate_pct']) }}%</div>
+        </div>
+        <div class="metric kpi primary-kpi" data-kpi="return">
+          <div class="k">Compounded Return</div>
+          <div class="v">{{ '%.2f'|format(stats.get('compounded_return_pct', stats['total_return_pct'])) }}%</div>
+        </div>
+        <div class="metric kpi primary-kpi" data-kpi="drawdown">
+          <div class="k">Max Drawdown</div>
+          <div class="v">{{ '%.2f'|format(stats['max_drawdown_pct']) }}%</div>
+        </div>
+        
+        <!-- Secondary metrics -->
+        <div class="metric secondary-metric" title="Risk to Reward Ratio">
+          <div class="k">R:R</div>
+          <div class="v">{{ '%.2f'|format(stats['risk_reward']) }}</div>
+        </div>
+        <div class="metric secondary-metric" title="Expected return per trade">
+          <div class="k">Expectancy</div>
+          <div class="v">{{ '%.2f'|format(stats['expectancy_pct']) }}%</div>
+        </div>
+        <div class="metric secondary-metric" title="Return to Max Drawdown ratio">
+          <div class="k">Calmar</div>
+          <div class="v">{{ '%.2f'|format(stats['calmar_ratio']) }}</div>
+        </div>
       </section>
       {% endif %}
 
       {% if audit_summary %}
       <section class="audit-summary" style="margin-top: 16px;">
         <div class="card">
-          <h3>🔍 Trade Audit Summary</h3>
-          <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
-            <div class="metric">
+          <div class="audit-header">
+            <h3>🔍 Trade Audit Summary</h3>
+            <div class="audit-pass-rate">
+              <span class="pass-rate-label">Pass Rate</span>
+              <span class="pass-rate-value pass-rate-{{ 'good' if audit_summary.pass_rate >= 80 else 'warn' if audit_summary.pass_rate >= 60 else 'bad' }}">
+                {{ '%.1f'|format(audit_summary.pass_rate) }}%
+              </span>
+            </div>
+          </div>
+          
+          <div class="audit-metrics">
+            <div class="audit-metric">
               <div class="k">Strategy Types</div>
               <div class="v">
                 {% for strategy, count in audit_summary.strategy_distribution.items() %}
-                  <span class="badge">{{ strategy }}: {{ count }}</span>
+                  <span class="strategy-badge strategy-{{ strategy.lower() }}">{{ strategy }}: {{ count }}</span>
                 {% endfor %}
               </div>
             </div>
-            <div class="metric">
-              <div class="k">Pass Rate</div>
-              <div class="v">{{ '%.1f'|format(audit_summary.pass_rate) }}%</div>
+            <div class="audit-metric">
+              <div class="k">Total Trades</div>
+              <div class="v">{{ audit_summary.total_trades }}</div>
             </div>
-            <div class="metric">
+            <div class="audit-metric">
               <div class="k">Failed Trades</div>
-              <div class="v">{{ audit_summary.failed_trades }}/{{ audit_summary.total_trades }}</div>
+              <div class="v failed-count">{{ audit_summary.failed_trades }}</div>
             </div>
           </div>
+          
           {% if audit_summary.common_violations %}
-          <div style="margin-top: 12px;">
-            <h4>Common Violations:</h4>
-            <ul style="margin: 8px 0; padding-left: 20px;">
-              {% for violation, count in audit_summary.common_violations[:3] %}
-              <li style="margin: 4px 0; font-size: 0.9em; color: #dc2626;">{{ violation }} ({{ count }} times)</li>
-              {% endfor %}
-            </ul>
+          <div class="violations-section">
+            <button class="violations-toggle" onclick="toggleViolations()">
+              <span class="toggle-icon">▼</span>
+              <span class="toggle-text">View Violations ({{ audit_summary.common_violations|length }})</span>
+            </button>
+            <div class="violations-panel" id="violations-panel" style="display: none;">
+              <div class="violations-grid">
+                {% for violation, count in audit_summary.common_violations %}
+                <div class="violation-item">
+                  <span class="violation-text">{{ violation }}</span>
+                  <span class="violation-count">{{ count }}x</span>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
           </div>
           {% endif %}
         </div>
       </section>
       {% endif %}
 
-            <div class="card raise" style="padding:0;margin-top:12px">
-              <canvas id="equityChart" height="140"></canvas>
+            <div class="card raise equity-chart-card" style="padding:0;margin-top:12px">
+              <div class="chart-header">
+                <h3>Equity Curve</h3>
+                <div class="chart-controls">
+                  <button class="chart-toggle active" data-view="cumulative">Cumulative</button>
+                  <button class="chart-toggle" data-view="per-trade">Per Trade</button>
+                </div>
+              </div>
+              <canvas id="equityChart" height="200"></canvas>
+              <div class="chart-footer">
+                <div class="chart-stats">
+                  <span class="chart-stat">Start: 100</span>
+                  <span class="chart-stat">End: <span id="equity-end">100</span></span>
+                  <span class="chart-stat">Peak: <span id="equity-peak">100</span></span>
+                  <span class="chart-stat">Trough: <span id="equity-trough">100</span></span>
+                </div>
+              </div>
             </div>
 
             <div class="card" id="ai-summary">
@@ -144,59 +219,105 @@
 
           <section class="tab-panel" id="tab-trades">
             <div class="card">
-              <div class="grid">
-                <label>Filter
-                  <select id="trade-filter">
-                    <option value="all">All trades</option>
-                    <option value="winners">Winners</option>
-                    <option value="losers">Losers</option>
-                    <option value="tp">TP hit</option>
-                    <option value="sl">SL hit</option>
-            </select>
-          </label>
-                <label>Sort by
-                  <select id="trade-sort">
-                    <option value="none">None</option>
-                    <option value="ret_desc">Return % (desc)</option>
-                    <option value="ret_asc">Return % (asc)</option>
-            </select>
-          </label>
-      </div>
-      </div>
-      <div class="table-wrap">
-              <table id="trades-table">
-          <thead>
-            <tr>
-              <th>Stock</th>
-              <th>Entry Date</th>
-              <th>Entry Time</th>
-              <th>Entry Price</th>
-              <th>Exit Date</th>
-              <th>Exit Time</th>
-              <th>Exit Price</th>
-              <th>Exit Reason</th>
-              <th>Return %</th>
-              <th>Error</th>
-            </tr>
-          </thead>
-                <tbody id="trades-body">
-            {% for row in rows %}
-            <tr>
-              <td>{{ row["Stock"] }}</td>
-              <td>{{ row["Entry Date"] }}</td>
-              <td>{{ row["Entry Time"] }}</td>
-              <td>{{ row["Entry Price"] }}</td>
-              <td>{{ row["Exit Date"] }}</td>
-              <td>{{ row.get("Exit Time", "") }}</td>
-              <td>{{ row["Exit Price"] }}</td>
-              <td>{{ row.get("Exit Reason", "") }}</td>
-              <td>{{ row["Return %"] }}</td>
-              <td>{{ row.get("Error", "") }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
+              <div class="trades-controls">
+                <div class="controls-row">
+                  <div class="control-group">
+                    <label>Filter
+                      <select id="trade-filter">
+                        <option value="all">All trades</option>
+                        <option value="winners">Winners</option>
+                        <option value="losers">Losers</option>
+                        <option value="tp">TP hit</option>
+                        <option value="sl">SL hit</option>
+                        <option value="btst">BTST trades</option>
+                        <option value="errors">With errors</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div class="control-group">
+                    <label>Sort by
+                      <select id="trade-sort">
+                        <option value="none">None</option>
+                        <option value="ret_desc">Return % (desc)</option>
+                        <option value="ret_asc">Return % (asc)</option>
+                        <option value="date_desc">Date (newest)</option>
+                        <option value="date_asc">Date (oldest)</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div class="control-group">
+                    <label>Show
+                      <select id="trades-per-page">
+                        <option value="25">25 per page</option>
+                        <option value="50" selected>50 per page</option>
+                        <option value="100">100 per page</option>
+                        <option value="all">All</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+                <div class="trades-summary">
+                  <span id="trades-count">Loading...</span>
+                  <span id="trades-pagination"></span>
+                </div>
+              </div>
+              
+              <div class="table-wrap">
+                <table id="trades-table">
+                  <thead>
+                    <tr>
+                      <th>Stock</th>
+                      <th>Entry Date</th>
+                      <th>Entry Time</th>
+                      <th>Entry Price</th>
+                      <th>Exit Date</th>
+                      <th>Exit Time</th>
+                      <th>Exit Price</th>
+                      <th>Exit Reason</th>
+                      <th>Return %</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="trades-body">
+                    {% for row in rows %}
+                    <tr class="trade-row" data-stock="{{ row['Stock'] }}" data-return="{{ row.get('Return %', 0) }}" data-reason="{{ row.get('Exit Reason', '') }}" data-error="{{ row.get('Error', '') }}">
+                      <td class="stock-cell">{{ row["Stock"] }}</td>
+                      <td>{{ row["Entry Date"] or "-" }}</td>
+                      <td>{{ row["Entry Time"] or "-" }}</td>
+                      <td class="price-cell">{{ row["Entry Price"] if row["Entry Price"] and row["Entry Price"] != 0 else "-" }}</td>
+                      <td>{{ row["Exit Date"] or "-" }}</td>
+                      <td>{{ row.get("Exit Time", "-") }}</td>
+                      <td class="price-cell">{{ row["Exit Price"] if row["Exit Price"] and row["Exit Price"] != 0 else "-" }}</td>
+                      <td class="reason-cell">
+                        {% if row.get("Exit Reason") %}
+                          <span class="reason-badge reason-{{ row.get('Exit Reason', '').lower().replace(' ', '-') }}">{{ row.get("Exit Reason") }}</span>
+                        {% else %}
+                          <span class="reason-badge reason-none">-</span>
+                        {% endif %}
+                      </td>
+                      <td class="return-cell">
+                        {% set return_val = row.get("Return %", 0) %}
+                        {% if return_val and return_val != 0 %}
+                          <span class="return-value return-{{ 'positive' if return_val > 0 else 'negative' if return_val < 0 else 'neutral' }}">
+                            {{ '%.2f'|format(return_val) }}%
+                          </span>
+                        {% else %}
+                          <span class="return-value return-neutral">-</span>
+                        {% endif %}
+                      </td>
+                      <td class="status-cell">
+                        {% if row.get("Error") %}
+                          <span class="status-badge status-error" title="{{ row.get('Error', '') }}">⚠️</span>
+                        {% else %}
+                          <span class="status-badge status-success">✅</span>
+                        {% endif %}
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </section>
 
           <section class="tab-panel" id="tab-entry">
@@ -234,6 +355,29 @@
             <button id="assistant-toggle">⇔</button>
           </div>
           <div id="assistant-body">
+            <div class="assistant-insights" id="assistant-insights">
+              <div class="insight-item">
+                <span class="insight-icon">💡</span>
+                <span class="insight-text">I see your win rate is <span id="insight-win-rate">loading...</span>%</span>
+              </div>
+              <div class="insight-item">
+                <span class="insight-icon">📊</span>
+                <span class="insight-text">Max drawdown: <span id="insight-drawdown">loading...</span>%</span>
+              </div>
+            </div>
+            
+            <div class="suggested-prompts">
+              <div class="prompts-header">Suggested Questions:</div>
+              <div class="prompt-chips">
+                <button class="prompt-chip" data-prompt="What are the main risks in this strategy?">Risks</button>
+                <button class="prompt-chip" data-prompt="Which cap buckets perform best?">Cap Analysis</button>
+                <button class="prompt-chip" data-prompt="How can I improve the win rate?">Improve Win Rate</button>
+                <button class="prompt-chip" data-prompt="What's the optimal SL/TP ratio?">SL/TP Optimization</button>
+                <button class="prompt-chip" data-prompt="Show me the best entry times">Entry Timing</button>
+                <button class="prompt-chip" data-prompt="Explain the audit violations">Audit Issues</button>
+              </div>
+            </div>
+            
             <div class="assistant-messages" id="assistant-messages"></div>
             <form id="assistant-form">
               <input type="text" id="assistant-input" placeholder="Ask about risks, caps, SL/TP..." />
@@ -439,6 +583,161 @@
           fetch('/ui/export_csv', { method:'POST', body: f }).then(function(r){ return r.blob(); }).then(function(b){ var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'backtest.csv'; a.click(); });
         }); }
         if(btnNotes){ btnNotes.addEventListener('click', function(){ var f = new FormData(); f.append('bt_json', document.getElementById('backtest-json').textContent); fetch('/ui/export_notes', { method:'POST', body: f }).then(function(r){ return r.blob(); }).then(function(b){ var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'ai_notes.txt'; a.click(); }); }); }
+      })();
+
+      // Strategy toggle
+      function toggleStrategy() {
+        var panel = document.getElementById('strategy-panel');
+        var icon = document.querySelector('.strategy-toggle .toggle-icon');
+        if (panel.style.display === 'none') {
+          panel.style.display = 'block';
+          icon.textContent = '▲';
+        } else {
+          panel.style.display = 'none';
+          icon.textContent = '▼';
+        }
+      }
+
+      // Violations toggle
+      function toggleViolations() {
+        var panel = document.getElementById('violations-panel');
+        var icon = document.querySelector('.violations-toggle .toggle-icon');
+        if (panel.style.display === 'none') {
+          panel.style.display = 'block';
+          icon.textContent = '▲';
+        } else {
+          panel.style.display = 'none';
+          icon.textContent = '▼';
+        }
+      }
+
+      // Enhanced trades table with pagination
+      (function(){
+        var rows = JSON.parse(document.getElementById('backtest-json').textContent).rows || [];
+        var tbody = document.getElementById('trades-body');
+        var filterEl = document.getElementById('trade-filter');
+        var sortEl = document.getElementById('trade-sort');
+        var perPageEl = document.getElementById('trades-per-page');
+        var countEl = document.getElementById('trades-count');
+        var paginationEl = document.getElementById('trades-pagination');
+        
+        var currentPage = 1;
+        var itemsPerPage = 50;
+        
+        function updatePagination(totalItems, currentPage, itemsPerPage) {
+          var totalPages = Math.ceil(totalItems / itemsPerPage);
+          var pagination = '';
+          
+          if (totalPages > 1) {
+            pagination += '<div class="pagination">';
+            if (currentPage > 1) {
+              pagination += '<button onclick="goToPage(' + (currentPage - 1) + ')">‹ Prev</button>';
+            }
+            pagination += '<span class="page-info">Page ' + currentPage + ' of ' + totalPages + '</span>';
+            if (currentPage < totalPages) {
+              pagination += '<button onclick="goToPage(' + (currentPage + 1) + ')">Next ›</button>';
+            }
+            pagination += '</div>';
+          }
+          
+          paginationEl.innerHTML = pagination;
+        }
+        
+        window.goToPage = function(page) {
+          currentPage = page;
+          render();
+        };
+        
+        function render(){
+          var data = rows.slice();
+          var f = filterEl.value;
+          
+          // Apply filters
+          if (f !== 'all'){
+            data = data.filter(function(r){
+              var ret = parseFloat(r['Return %'] || 0);
+              var reason = (r['Exit Reason'] || '').toLowerCase();
+              var error = (r['Error'] || '').toLowerCase();
+              
+              if (f==='winners') return ret>0;
+              if (f==='losers') return ret<0;
+              if (f==='tp') return reason.indexOf('tp')>=0 || reason.indexOf('take')>=0;
+              if (f==='sl') return reason.indexOf('sl')>=0 || reason.indexOf('stop')>=0;
+              if (f==='btst') return reason.indexOf('btst')>=0;
+              if (f==='errors') return error.length > 0;
+              return true;
+            });
+          }
+          
+          // Apply sorting
+          var s = sortEl.value;
+          if (s==='ret_desc') data.sort(function(a,b){ return (parseFloat(b['Return %']||0) - parseFloat(a['Return %']||0)); });
+          if (s==='ret_asc') data.sort(function(a,b){ return (parseFloat(a['Return %']||0) - parseFloat(b['Return %']||0)); });
+          if (s==='date_desc') data.sort(function(a,b){ return new Date(b['Entry Date']||0) - new Date(a['Entry Date']||0); });
+          if (s==='date_asc') data.sort(function(a,b){ return new Date(a['Entry Date']||0) - new Date(b['Entry Date']||0); });
+          
+          // Update count
+          countEl.textContent = data.length + ' trades';
+          
+          // Apply pagination
+          var startIndex = (currentPage - 1) * itemsPerPage;
+          var endIndex = startIndex + itemsPerPage;
+          var paginatedData = data.slice(startIndex, endIndex);
+          
+          // Update pagination controls
+          updatePagination(data.length, currentPage, itemsPerPage);
+          
+          // Render table
+          tbody.innerHTML = paginatedData.map(function(r){
+            var returnVal = parseFloat(r['Return %'] || 0);
+            var returnClass = returnVal > 0 ? 'positive' : returnVal < 0 ? 'negative' : 'neutral';
+            var reasonClass = (r['Exit Reason'] || '').toLowerCase().replace(/\s+/g, '-');
+            
+            return '<tr class="trade-row">'+
+              '<td class="stock-cell">'+ (r['Stock']||'') +'</td>'+
+              '<td>'+ (r['Entry Date']||'-') +'</td>'+
+              '<td>'+ (r['Entry Time']||'-') +'</td>'+
+              '<td class="price-cell">'+ (r['Entry Price'] && r['Entry Price'] != 0 ? r['Entry Price'] : '-') +'</td>'+
+              '<td>'+ (r['Exit Date']||'-') +'</td>'+
+              '<td>'+ (r['Exit Time']||'-') +'</td>'+
+              '<td class="price-cell">'+ (r['Exit Price'] && r['Exit Price'] != 0 ? r['Exit Price'] : '-') +'</td>'+
+              '<td class="reason-cell"><span class="reason-badge reason-'+reasonClass+'">'+ (r['Exit Reason']||'-') +'</span></td>'+
+              '<td class="return-cell"><span class="return-value return-'+returnClass+'">'+ (returnVal != 0 ? returnVal.toFixed(2) + '%' : '-') +'</span></td>'+
+              '<td class="status-cell"><span class="status-badge status-'+ (r['Error'] ? 'error' : 'success') +'" title="'+ (r['Error']||'') +'">'+ (r['Error'] ? '⚠️' : '✅') +'</span></td>'+
+            '</tr>';
+          }).join('');
+        }
+
+        // Event listeners
+        filterEl.addEventListener('change', function(){ currentPage = 1; render(); });
+        sortEl.addEventListener('change', function(){ currentPage = 1; render(); });
+        perPageEl.addEventListener('change', function(){ 
+          itemsPerPage = perPageEl.value === 'all' ? rows.length : parseInt(perPageEl.value);
+          currentPage = 1; 
+          render(); 
+        });
+
+        // Initial render
+        render();
+      })();
+
+      // AI Assistant enhancements
+      (function(){
+        // Update insights with actual data
+        try {
+          var stats = JSON.parse(document.getElementById('backtest-json').textContent).stats || {};
+          document.getElementById('insight-win-rate').textContent = (stats.win_rate_pct || 0).toFixed(1);
+          document.getElementById('insight-drawdown').textContent = (stats.max_drawdown_pct || 0).toFixed(1);
+        } catch(e) {}
+        
+        // Prompt chips
+        document.querySelectorAll('.prompt-chip').forEach(function(chip) {
+          chip.addEventListener('click', function() {
+            var prompt = this.dataset.prompt;
+            document.getElementById('assistant-input').value = prompt;
+            document.getElementById('assistant-input').focus();
+          });
+        });
       })();
   </script>
   </body>

@@ -212,7 +212,7 @@
   {% if equity %}
   <script id="equity-data" type="application/json">{{ equity | tojson | safe }}</script>
   {% endif %}
-    <script id="backtest-json" type="application/json">{ "stats": {{ stats | tojson | safe }}, "insights": {{ insights | tojson | safe }}, "rows": {{ rows | tojson | safe }} }</script>
+    <script id="backtest-json" type="application/json">{ "stats": {{ stats | default({}) | tojson | safe }}, "insights": {{ insights | default({}) | tojson | safe }}, "rows": {{ rows | default([]) | tojson | safe }} }</script>
   <script>
       // Tabs
       document.querySelectorAll('.tab-btn').forEach(function(btn){

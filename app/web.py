@@ -437,17 +437,43 @@ async def ui_ai_strategy(
         if not content:
             raise RuntimeError("Empty response from Perplexity")
 
-        # Clean fenced code blocks if present
+        # Clean fenced code blocks and strip optional language tags if present
         if "```" in content:
             parts = content.split("```")
             # Prefer the first fenced block that looks like CSV
             csv_text = None
             for i in range(1, len(parts), 2):
                 block = parts[i]
-                if "," in block and ("stock" in block.lower() or "entry_date" in block.lower()):
+                # Strip a leading language line like: csv\n...
+                stripped = block.lstrip()
+                if "\n" in stripped:
+                    first, rest = stripped.split("\n", 1)
+                    if first.strip().lower() in ("csv", "text", "plaintext"):
+                        block = rest
+                    else:
+                        block = stripped
+                else:
+                    block = stripped
+                if "," in block and ("stock" in block.lower() or "entry_date" in block.lower() or "date" in block.lower()):
                     csv_text = block
                     break
             content = csv_text or content
+
+        # Ensure first non-empty line is a header row with required columns
+        def _sanitize_csv_text(txt: str) -> str:
+            lines = [ln for ln in (txt or "").splitlines() if ln.strip()]
+            if not lines:
+                return txt or ""
+            def looks_like_header(s: str) -> bool:
+                s = s.lower()
+                return ("," in s) and ("stock" in s) and ("entry_date" in s or "date" in s or "datetime" in s)
+            if not looks_like_header(lines[0]):
+                for idx, ln in enumerate(lines):
+                    if looks_like_header(ln):
+                        lines = lines[idx:]
+                        break
+            return "\n".join(lines)
+        content = _sanitize_csv_text(content)
 
         # Persist CSV to temp after enforcing optional date range
         tmp_csv_path = "/tmp/ai_strategy.csv"

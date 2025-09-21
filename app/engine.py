@@ -162,28 +162,32 @@ def compute_entry_exit_for_row(
                 if daily.empty:
                     raise ValueError(f"No daily data for {row.stock}")
                 daily_dates = pd.Index([ts.astimezone(tz).date() for ts in daily.index])
-            candidate_positions = [i for i, d in enumerate(daily_dates) if d >= exit_trade_date]
-            if not candidate_positions:
-                exit_pos = len(daily) - 1
-            else:
-                exit_pos = candidate_positions[0]
-            exit_ts = daily.index[exit_pos]
-            exit_price = float(daily.iloc[exit_pos]["close"])  # type: ignore
-            exit_ts_local = exit_ts.astimezone(tz)
-            exit_time_str = "15:30" if (exit_ts_local.hour == 0 and exit_ts_local.minute == 0) else exit_ts_local.strftime("%H:%M")
+                candidate_positions = [i for i, d in enumerate(daily_dates) if d >= exit_trade_date]
+                if not candidate_positions:
+                    exit_pos = len(daily) - 1
+                else:
+                    exit_pos = candidate_positions[0]
+                exit_ts = daily.index[exit_pos]
+                exit_price = float(daily.iloc[exit_pos]["close"])  # type: ignore
+                exit_ts_local = exit_ts.astimezone(tz)
+                exit_time_str = "15:30" if (exit_ts_local.hour == 0 and exit_ts_local.minute == 0) else exit_ts_local.strftime("%H:%M")
     else:
         exit_time_str = exit_ts.astimezone(tz).strftime("%H:%M")
 
-    ret_pct = (exit_price - entry_price) / entry_price * 100.0
+    # Calculate return percentage with error handling
+    if entry_price and exit_price and entry_price > 0:
+        ret_pct = (exit_price - entry_price) / entry_price * 100.0
+    else:
+        ret_pct = 0.0
 
     return {
         "Stock": row.stock,
         "Entry Date": row.entry_date.isoformat(),
         "Entry Time": row.entry_time.strftime("%H:%M"),
-        "Entry Price": round(entry_price, 4),
+        "Entry Price": round(entry_price, 4) if entry_price else 0.0,
         "Exit Date": exit_ts.astimezone(tz).date().isoformat(),
         "Exit Time": exit_time_str,
-        "Exit Price": round(exit_price, 4),
+        "Exit Price": round(exit_price, 4) if exit_price else 0.0,
         "Return %": round(ret_pct, 4),
         "Exit Reason": exit_reason,
     }
@@ -234,12 +238,12 @@ def run_backtest_from_csv(
                     "Stock": r.stock,
                     "Entry Date": r.entry_date.isoformat(),
                     "Entry Time": r.entry_time.strftime("%H:%M"),
-                    "Entry Price": None,
-                    "Exit Date": None,
-                    "Exit Time": None,
-                    "Exit Price": None,
-                    "Return %": None,
-                    "Exit Reason": None,
+                    "Entry Price": 0.0,
+                    "Exit Date": r.entry_date.isoformat(),
+                    "Exit Time": "15:30",
+                    "Exit Price": 0.0,
+                    "Return %": 0.0,
+                    "Exit Reason": "Error",
                     "Error": str(e),
                 }
             )

@@ -140,7 +140,11 @@
           <div class="form-group">
             <h3>Kite Connect <span class="tooltip" title="Required for market data">?</span>
               <span class="status-indicator" id="kite-status">
+                {% if kite_connected %}
+                <span class="status-connected">✅ Connected</span>
+                {% else %}
                 <span class="status-disconnected">❌ Not Connected</span>
+                {% endif %}
               </span>
             </h3>
             <div class="grid">
@@ -309,10 +313,13 @@
     </main>
     
     <script>
+      // Server-provided initial connection flags
+      const initialKiteConnected = {{ 'true' if kite_connected else 'false' }};
+      const initialPplxConnected = {{ 'true' if pplx_present else 'false' }};
       let currentStep = 1;
       let dataSource = 'csv';
-      let kiteConnected = false;
-      let pplxConnected = false;
+      let kiteConnected = initialKiteConnected;
+      let pplxConnected = initialPplxConnected;
       
       function updateProgress() {
         const progress = (currentStep / 4) * 100;
@@ -555,10 +562,17 @@
       
       
       // Check connection status on load
-      if (new URLSearchParams(window.location.search).get('authed') === '1') {
-        kiteConnected = true;
-        updateConnectionStatus('kite', true);
-      }
+      (function(){
+        const authed = new URLSearchParams(window.location.search).get('authed') === '1';
+        if (authed || initialKiteConnected) {
+          kiteConnected = true;
+          updateConnectionStatus('kite', true);
+        }
+        if (initialPplxConnected) {
+          pplxConnected = true;
+          updateConnectionStatus('pplx', true);
+        }
+      })();
       
       // Validate inputs in real-time
       document.getElementById('days').addEventListener('input', () => clearError('days-error'));
@@ -574,6 +588,13 @@
           if(localStorage.getItem(key)) el.value = localStorage.getItem(key);
           el.addEventListener('change', ()=> localStorage.setItem(key, el.value));
         });
+        // Remember Kite API key/secret locally (browser only) for convenience
+        const kKey = document.getElementById('kite-api-key');
+        const kSec = document.getElementById('kite-api-secret');
+        if (localStorage.getItem('bt_kite_api_key')) kKey.value = localStorage.getItem('bt_kite_api_key');
+        if (localStorage.getItem('bt_kite_api_secret')) kSec.value = localStorage.getItem('bt_kite_api_secret');
+        kKey.addEventListener('change', ()=> localStorage.setItem('bt_kite_api_key', kKey.value));
+        kSec.addEventListener('change', ()=> localStorage.setItem('bt_kite_api_secret', kSec.value));
       } catch(e) {}
     </script>
   </body>

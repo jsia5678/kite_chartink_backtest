@@ -97,6 +97,7 @@ async def backtest_endpoint(
             symbol_cap_csv_path=cap_meta_path,
             breakeven_profit_pct=_to_opt_float(breakeven_profit_pct),
             breakeven_at_sl=bool(breakeven_at_sl),
+            enable_audit=True,
         )
         if output == "csv":
             csv_bytes = df.to_csv(index=False).encode("utf-8")
@@ -271,10 +272,12 @@ async def ui_backtest(
             symbol_cap_csv_path=cap_meta_path,
             breakeven_profit_pct=_to_opt_float(breakeven_profit_pct),
             breakeven_at_sl=bool(breakeven_at_sl),
+            enable_audit=True,
         )
         records = df.to_dict(orient="records")
         equity, stats = compute_equity_and_stats(df)
         insights = compute_insights(df)
+        audit_summary = df.attrs.get('audit_summary', None)
         return templates.TemplateResponse(
             "results.html",
             {
@@ -284,6 +287,7 @@ async def ui_backtest(
                 "stats": stats,
                 "equity": equity,
                 "insights": insights,
+                "audit_summary": audit_summary,
                 "csv_path": tmp_path,
                 "defaults": {
                     "days": days,
@@ -517,6 +521,7 @@ async def ui_ai_strategy(
             tp_pct=_to_opt_float(tp_pct),
             breakeven_profit_pct=_to_opt_float(breakeven_profit_pct),
             breakeven_at_sl=bool(breakeven_at_sl),
+            enable_audit=True,
         )
         # Re-compute with chosen intraday interval by applying row-wise if intraday_interval differs from default
         # Note: run_backtest_from_csv uses compute_entry_exit_for_row; we need a version that passes intraday_interval.
@@ -563,6 +568,7 @@ async def ui_ai_strategy(
         records = df.to_dict(orient="records")
         equity, stats = compute_equity_and_stats(df)
         insights = compute_insights(df)
+        audit_summary = df.attrs.get('audit_summary', None)
         return templates.TemplateResponse(
             "results.html",
             {
@@ -572,6 +578,7 @@ async def ui_ai_strategy(
                 "stats": stats,
                 "equity": equity,
                 "insights": insights,
+                "audit_summary": audit_summary,
                 "ai_prompt": prompt,
                 "csv_path": tmp_csv_path,
                 "defaults": {
@@ -632,10 +639,12 @@ async def ui_rerun(
             allowed_cap_buckets=allowed_caps or None,
             breakeven_profit_pct=_to_opt_float(breakeven_profit_pct),
             breakeven_at_sl=bool(breakeven_at_sl),
+            enable_audit=True,
         )
         records = df.to_dict(orient="records")
         equity, stats = compute_equity_and_stats(df)
         insights = compute_insights(df)
+        audit_summary = df.attrs.get('audit_summary', None)
         return templates.TemplateResponse(
             "results.html",
             {
@@ -645,6 +654,7 @@ async def ui_rerun(
                 "stats": stats,
                 "equity": equity,
                 "insights": insights,
+                "audit_summary": audit_summary,
                 "csv_path": csv_path,
                 "defaults": {
                     "days": days,
@@ -757,6 +767,7 @@ async def ui_export_csv(
             tp_pct=_to_opt_float(tp_pct),
             breakeven_profit_pct=_to_opt_float(breakeven_profit_pct),
             breakeven_at_sl=bool(breakeven_at_sl),
+            enable_audit=True,
         )
         csv_bytes = df.to_csv(index=False).encode("utf-8")
         return StreamingResponse(io.BytesIO(csv_bytes), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=backtest.csv"})

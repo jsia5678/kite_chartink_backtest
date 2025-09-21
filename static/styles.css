@@ -550,3 +550,76 @@ input[type="date"] {
   font-family: inherit;
   transition: all 0.2s ease;
 }
+
+/* Audit Summary Styling */
+.audit-summary {
+  margin-top: 16px;
+}
+
+.audit-summary .card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+.audit-summary h3 {
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.audit-summary h4 {
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.audit-summary .badge {
+  display: inline-block;
+  padding: 4px 8px;
+  background: var(--accent-blue);
+  color: white;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  margin: 2px;
+}
+
+.audit-summary .metric {
+  text-align: center;
+}
+
+.audit-summary .metric .k {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.audit-summary .metric .v {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.audit-summary ul {
+  list-style: none;
+  padding: 0;
+}
+
+.audit-summary li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.audit-summary li:last-child {
+  border-bottom: none;
+}

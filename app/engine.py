@@ -9,6 +9,7 @@ import pytz
 from .kite_service import KiteService
 from .utils import parse_chartink_csv, nearest_prior_timestamp, trading_days_ahead
 from .types import BacktestInputRow
+from .trade_audit import TradeAuditor
 
 
 
@@ -149,6 +150,7 @@ def run_backtest_from_csv(
     symbol_cap_csv_path: Optional[str] | None = None,
     breakeven_profit_pct: Optional[float] | None = None,
     breakeven_at_sl: bool = False,
+    enable_audit: bool = True,
 ) -> pd.DataFrame:
     tz = pytz.timezone(timezone_name)
     kite = KiteService.from_env()
@@ -246,6 +248,21 @@ def run_backtest_from_csv(
         if allowed_set:
             df = df[df["Cap Bucket"].isin(allowed_set)]
 
+    # Apply trade audit if enabled
+    if enable_audit:
+        try:
+            auditor = TradeAuditor(timezone=timezone_name)
+            df_audited, audit_summary = auditor.audit_trade_log(df, num_days)
+            
+            # Add audit summary as metadata (stored in df attributes)
+            df_audited.attrs['audit_summary'] = audit_summary
+            
+            # Use audited dataframe
+            df = df_audited
+        except Exception as e:
+            # If audit fails, continue with original dataframe but log the error
+            print(f"Trade audit failed: {e}")
+    
     preferred = ["Stock", "Entry Date", "Entry Time", "Entry Price", "Exit Date", "Exit Time", "Exit Price", "Return %", "Exit Reason"]
     remaining = [c for c in df.columns if c not in preferred]
     return df[preferred + remaining]

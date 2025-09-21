@@ -96,6 +96,42 @@
       </section>
       {% endif %}
 
+      {% if audit_summary %}
+      <section class="audit-summary" style="margin-top: 16px;">
+        <div class="card">
+          <h3>🔍 Trade Audit Summary</h3>
+          <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
+            <div class="metric">
+              <div class="k">Strategy Types</div>
+              <div class="v">
+                {% for strategy, count in audit_summary.strategy_distribution.items() %}
+                  <span class="badge">{{ strategy }}: {{ count }}</span>
+                {% endfor %}
+              </div>
+            </div>
+            <div class="metric">
+              <div class="k">Pass Rate</div>
+              <div class="v">{{ '%.1f'|format(audit_summary.pass_rate) }}%</div>
+            </div>
+            <div class="metric">
+              <div class="k">Failed Trades</div>
+              <div class="v">{{ audit_summary.failed_trades }}/{{ audit_summary.total_trades }}</div>
+            </div>
+          </div>
+          {% if audit_summary.common_violations %}
+          <div style="margin-top: 12px;">
+            <h4>Common Violations:</h4>
+            <ul style="margin: 8px 0; padding-left: 20px;">
+              {% for violation, count in audit_summary.common_violations[:3] %}
+              <li style="margin: 4px 0; font-size: 0.9em; color: #dc2626;">{{ violation }} ({{ count }} times)</li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endif %}
+        </div>
+      </section>
+      {% endif %}
+
             <div class="card raise" style="padding:0;margin-top:12px">
               <canvas id="equityChart" height="140"></canvas>
             </div>

@@ -82,14 +82,14 @@ class TradeAuditor:
         """
         Detect strategy type based on entry/exit patterns and holding period
         """
-        # BTST: Entry near close (15:15-15:30), exit near open (9:15-10:00), 1-2 days
-        if (self._is_time_in_range(entry_time, dt.time(15, 15), dt.time(15, 30)) and
-            self._is_time_in_range(exit_time, dt.time(9, 15), dt.time(10, 0)) and
-            holding_days <= 2):
+        # BTST: Entry near close (15:15-15:30), should exit next day at open
+        # Even if exit time is wrong, if entry is 15:15-15:30, it's likely BTST
+        if self._is_time_in_range(entry_time, dt.time(15, 15), dt.time(15, 30)):
             return StrategyType.BTST
         
-        # Intraday: Same day entry/exit or very short holding
-        if holding_days <= 1 and not self._is_overnight_carry(entry_time, exit_time):
+        # Intraday: Entry during market hours (9:15-15:00), same day exit
+        if (self._is_time_in_range(entry_time, dt.time(9, 15), dt.time(15, 0)) and
+            holding_days <= 1):
             return StrategyType.INTRADAY
         
         # Swing: Longer holding period, multiple days allowed
@@ -139,23 +139,31 @@ class TradeAuditor:
                 "audit_status": "PASS"
             }
             
-            # Validate entry timing
-            entry_violation = self._validate_entry_timing(entry_time, strategy_rules)
-            if entry_violation:
-                audit_result["violations"].append(entry_violation)
-                audit_result["audit_status"] = "FAIL"
-            
-            # Validate exit timing
-            exit_violation = self._validate_exit_timing(exit_time, strategy_rules, holding_days)
-            if exit_violation:
-                audit_result["violations"].append(exit_violation)
-                audit_result["audit_status"] = "FAIL"
-            
-            # Validate holding period
-            holding_violation = self._validate_holding_period(holding_days, strategy_rules, num_days_param)
-            if holding_violation:
-                audit_result["violations"].append(holding_violation)
-                audit_result["audit_status"] = "FAIL"
+            # Special BTST validation
+            if strategy_type == StrategyType.BTST:
+                btst_violations = self._validate_btst_trade(entry_time, exit_time, holding_days, exit_reason)
+                audit_result["violations"].extend(btst_violations)
+                if btst_violations:
+                    audit_result["audit_status"] = "FAIL"
+            else:
+                # Standard validation for other strategies
+                # Validate entry timing
+                entry_violation = self._validate_entry_timing(entry_time, strategy_rules)
+                if entry_violation:
+                    audit_result["violations"].append(entry_violation)
+                    audit_result["audit_status"] = "FAIL"
+                
+                # Validate exit timing
+                exit_violation = self._validate_exit_timing(exit_time, strategy_rules, holding_days)
+                if exit_violation:
+                    audit_result["violations"].append(exit_violation)
+                    audit_result["audit_status"] = "FAIL"
+                
+                # Validate holding period
+                holding_violation = self._validate_holding_period(holding_days, strategy_rules, num_days_param)
+                if holding_violation:
+                    audit_result["violations"].append(holding_violation)
+                    audit_result["audit_status"] = "FAIL"
             
             # Validate exit reason
             exit_reason_violation = self._validate_exit_reason(exit_reason, strategy_type, entry_price, exit_price)
@@ -188,6 +196,25 @@ class TradeAuditor:
                 "audit_status": "ERROR"
             }
     
+    def _validate_btst_trade(self, entry_time: dt.time, exit_time: dt.time, 
+                           holding_days: int, exit_reason: str) -> List[str]:
+        """Special validation for BTST trades"""
+        violations = []
+        
+        # BTST should exit at market open (9:15-9:25), not at close
+        if not self._is_time_in_range(exit_time, dt.time(9, 15), dt.time(9, 25)):
+            violations.append(f"BTST exit time {exit_time.strftime('%H:%M')} should be 09:15-09:25, not at close")
+        
+        # BTST should hold for exactly 1 day
+        if holding_days != 1:
+            violations.append(f"BTST holding period {holding_days} days should be exactly 1 day")
+        
+        # BTST exit reason should reflect gap-up logic, not "Time"
+        if exit_reason == "Time":
+            violations.append("BTST exit reason 'Time' should be 'BTST_GapUp' or 'BTST_NoGap'")
+        
+        return violations
+    
     def _validate_entry_timing(self, entry_time: dt.time, rules: StrategyRules) -> Optional[str]:
         """Validate entry timing against strategy rules"""
         if not any(self._is_time_in_range(entry_time, allowed, allowed) 
@@ -207,6 +234,11 @@ class TradeAuditor:
         max_allowed = min(rules.max_holding_days, num_days_param)
         if holding_days > max_allowed:
             return f"Holding period {holding_days} days exceeds max allowed {max_allowed} for {rules.strategy_type.value} strategy"
+        
+        # Special validation for BTST: should be exactly 1 day
+        if rules.strategy_type == StrategyType.BTST and holding_days != 1:
+            return f"BTST strategy should hold for exactly 1 day, but holding for {holding_days} days"
+        
         return None
     
     def _validate_exit_reason(self, exit_reason: str, strategy_type: StrategyType, 
@@ -231,12 +263,24 @@ class TradeAuditor:
         corrected = trade.copy()
         
         if strategy_type == StrategyType.BTST:
-            # BTST: Ensure exit is at next day open
+            # BTST: Ensure exit is at next day open with proper gap-up logic
             entry_date = pd.to_datetime(trade.get("Entry Date")).date()
-            next_day = entry_date + dt.timedelta(days=1)
+            entry_price = trade.get("Entry Price", 0)
+            exit_price = trade.get("Exit Price", 0)
+            
+            # Calculate next trading day (skip weekends)
+            next_day = self._get_next_trading_day(entry_date)
             corrected["Exit Date"] = next_day.isoformat()
-            corrected["Exit Time"] = "09:15"  # Market open
-            corrected["Exit Reason"] = "BTST_Open"
+            
+            # BTST exit logic: gap-up open or same price
+            if exit_price > entry_price * 1.005:  # 0.5% gap-up threshold
+                corrected["Exit Time"] = "09:15"  # Gap-up open
+                corrected["Exit Reason"] = "BTST_GapUp"
+            else:
+                corrected["Exit Time"] = "09:25"  # No gap, sell at same price
+                corrected["Exit Reason"] = "BTST_NoGap"
+                # Adjust exit price to entry price if no gap
+                corrected["Exit Price"] = entry_price
             
         elif strategy_type == StrategyType.INTRADAY:
             # Intraday: Ensure same day exit
@@ -251,6 +295,14 @@ class TradeAuditor:
                 corrected["Exit Reason"] = "Swing_Time"
         
         return corrected
+    
+    def _get_next_trading_day(self, date: dt.date) -> dt.date:
+        """Get next trading day (skip weekends)"""
+        next_day = date + dt.timedelta(days=1)
+        # Skip weekends
+        while next_day.weekday() >= 5:  # Saturday = 5, Sunday = 6
+            next_day += dt.timedelta(days=1)
+        return next_day
     
     def _calculate_return(self, entry_price: float, exit_price: float) -> float:
         """Calculate return percentage"""

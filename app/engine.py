@@ -27,6 +27,9 @@ def compute_entry_exit_for_row(
 ) -> dict:
     # Build localized entry timestamp
     entry_dt_local = tz.localize(dt.datetime.combine(row.entry_date, row.entry_time))
+    
+    # Detect if this is a BTST trade based on entry time
+    is_btst = row.entry_time >= dt.time(15, 15) and row.entry_time <= dt.time(15, 30)
 
     # Get instrument token
     token = kite.resolve_instrument_token(symbol=row.stock, exchange=exchange)
@@ -47,11 +50,20 @@ def compute_entry_exit_for_row(
     # Scheduled exit date after N trading days
     exit_trade_date = trading_days_ahead(entry_dt_local.date(), num_days)
 
-    # Defaults
-    exit_reason = "Time"
-    exit_ts = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(15, 30)))
+    # Defaults - adjust for BTST trades
+    if is_btst:
+        # BTST: Exit next day at market open
+        exit_trade_date = trading_days_ahead(entry_dt_local.date(), 1)
+        exit_ts = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(9, 15)))
+        exit_time_str = "09:15"
+        exit_reason = "BTST_Open"
+    else:
+        # Regular trades: Exit at market close
+        exit_ts = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(15, 30)))
+        exit_time_str = "15:30"
+        exit_reason = "Time"
+    
     exit_price: Optional[float] = None
-    exit_time_str = "15:30"
 
     # If SL/TP provided, scan intraday candles from entry onward using intraday_interval CLOSES
     if (sl_pct is not None and sl_pct > 0) or (tp_pct is not None and tp_pct > 0) or (breakeven_profit_pct is not None) or breakeven_at_sl:
@@ -93,23 +105,53 @@ def compute_entry_exit_for_row(
                     exit_ts = ts
                     break
 
-    # If neither SL nor TP triggered, exit at last intraday close on the Nth trading day
+    # If neither SL nor TP triggered, handle exit based on strategy type
     if exit_price is None:
-        day_start = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(9, 0)))
-        day_end = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(15, 30)))
-        intraday_exit = kite.fetch_ohlc(token=token, interval=intraday_interval, start=day_start, end=day_end, tz=tz)
-        if not intraday_exit.empty:
-            exit_ts = intraday_exit.index[-1]
-            exit_price = float(intraday_exit.iloc[-1]["close"])  # type: ignore
-            exit_time_str = exit_ts.astimezone(tz).strftime("%H:%M")
+        if is_btst:
+            # BTST: Exit at next day open with gap-up logic
+            day_start = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(9, 0)))
+            day_end = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(9, 30)))
+            intraday_exit = kite.fetch_ohlc(token=token, interval=intraday_interval, start=day_start, end=day_end, tz=tz)
+            
+            if not intraday_exit.empty:
+                # Get opening price (first candle of the day)
+                open_ts = intraday_exit.index[0]
+                open_price = float(intraday_exit.iloc[0]["open"])  # type: ignore
+                
+                # Check for gap-up (0.5% threshold)
+                if open_price > entry_price * 1.005:
+                    exit_ts = open_ts
+                    exit_price = open_price
+                    exit_reason = "BTST_GapUp"
+                    exit_time_str = "09:15"
+                else:
+                    # No gap, sell at entry price
+                    exit_ts = open_ts
+                    exit_price = entry_price
+                    exit_reason = "BTST_NoGap"
+                    exit_time_str = "09:25"
+            else:
+                # Fallback for BTST
+                exit_price = entry_price
+                exit_reason = "BTST_NoGap"
+                exit_time_str = "09:25"
         else:
-            # Fallback to daily close if no intraday data available
-            daily_start = tz.localize(dt.datetime.combine(entry_dt_local.date() - dt.timedelta(days=10), dt.time(9, 0)))
-            daily_end = tz.localize(dt.datetime.combine(exit_trade_date + dt.timedelta(days=5), dt.time(15, 30)))
-            daily = kite.fetch_ohlc(token=token, interval="day", start=daily_start, end=daily_end, tz=tz)
-            if daily.empty:
-                raise ValueError(f"No daily data for {row.stock}")
-            daily_dates = pd.Index([ts.astimezone(tz).date() for ts in daily.index])
+            # Regular trades: Exit at market close
+            day_start = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(9, 0)))
+            day_end = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(15, 30)))
+            intraday_exit = kite.fetch_ohlc(token=token, interval=intraday_interval, start=day_start, end=day_end, tz=tz)
+            if not intraday_exit.empty:
+                exit_ts = intraday_exit.index[-1]
+                exit_price = float(intraday_exit.iloc[-1]["close"])  # type: ignore
+                exit_time_str = exit_ts.astimezone(tz).strftime("%H:%M")
+            else:
+                # Fallback to daily close if no intraday data available
+                daily_start = tz.localize(dt.datetime.combine(entry_dt_local.date() - dt.timedelta(days=10), dt.time(9, 0)))
+                daily_end = tz.localize(dt.datetime.combine(exit_trade_date + dt.timedelta(days=5), dt.time(15, 30)))
+                daily = kite.fetch_ohlc(token=token, interval="day", start=daily_start, end=daily_end, tz=tz)
+                if daily.empty:
+                    raise ValueError(f"No daily data for {row.stock}")
+                daily_dates = pd.Index([ts.astimezone(tz).date() for ts in daily.index])
             candidate_positions = [i for i, d in enumerate(daily_dates) if d >= exit_trade_date]
             if not candidate_positions:
                 exit_pos = len(daily) - 1

@@ -32,8 +32,11 @@ The Trade Audit System is a self-auditing tool that ensures trades follow define
 ### 🔧 Automatic Corrections
 
 #### BTST Strategy
-- Corrects exit to next day open (09:15)
-- Sets proper exit reason as "BTST_Open"
+- Corrects exit to next day open (09:15-09:25)
+- Gap-up detection: Exit at 09:15 if open > entry * 1.005
+- Gap-down detection: Exit at 09:15 if open < entry * 0.995
+- No gap: Exit at 09:25 at entry price
+- Sets proper exit reasons: "BTST_GapUp", "BTST_GapDown", or "BTST_NoGap"
 
 #### Intraday Strategy
 - Ensures same-day exit at market close (15:30)
@@ -111,6 +114,11 @@ StrategyRules(
     exit_at_close_required=False
 )
 ```
+
+**Gap Logic:**
+- **Gap-Up**: Exit at 09:15 if next day open > entry price * 1.005 (+0.5%)
+- **Gap-Down**: Exit at 09:15 if next day open < entry price * 0.995 (-0.5%)
+- **No Gap**: Exit at 09:25 at entry price if no significant gap
 
 ### Swing Strategy
 ```python

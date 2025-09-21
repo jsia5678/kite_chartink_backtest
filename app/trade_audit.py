@@ -61,7 +61,7 @@ class TradeAuditor:
             allowed_exit_times=[dt.time(9, 15), dt.time(9, 30), dt.time(10, 0)],
             overnight_allowed=True,
             exit_at_close_required=False,
-            description="BTST: Buy today, sell tomorrow at open"
+            description="BTST: Buy today, sell tomorrow at open (gap-up/gap-down/no-gap)"
         ),
         StrategyType.SWING: StrategyRules(
             strategy_type=StrategyType.SWING,
@@ -209,9 +209,9 @@ class TradeAuditor:
         if holding_days != 1:
             violations.append(f"BTST holding period {holding_days} days should be exactly 1 day")
         
-        # BTST exit reason should reflect gap-up logic, not "Time"
+        # BTST exit reason should reflect gap logic, not "Time"
         if exit_reason == "Time":
-            violations.append("BTST exit reason 'Time' should be 'BTST_GapUp' or 'BTST_NoGap'")
+            violations.append("BTST exit reason 'Time' should be 'BTST_GapUp', 'BTST_GapDown', or 'BTST_NoGap'")
         
         return violations
     
@@ -254,6 +254,10 @@ class TradeAuditor:
             return f"Exit reason 'TP' but actual return is {actual_return:.2f}%"
         elif exit_reason == "SL" and actual_return >= 0:
             return f"Exit reason 'SL' but actual return is {actual_return:.2f}%"
+        elif exit_reason == "BTST_GapUp" and actual_return <= 0:
+            return f"Exit reason 'BTST_GapUp' but actual return is {actual_return:.2f}%"
+        elif exit_reason == "BTST_GapDown" and actual_return >= 0:
+            return f"Exit reason 'BTST_GapDown' but actual return is {actual_return:.2f}%"
         
         return None
     
@@ -272,11 +276,20 @@ class TradeAuditor:
             next_day = self._get_next_trading_day(entry_date)
             corrected["Exit Date"] = next_day.isoformat()
             
-            # BTST exit logic: gap-up open or same price
-            if exit_price > entry_price * 1.005:  # 0.5% gap-up threshold
+            # BTST exit logic: gap-up, gap-down, or no gap
+            gap_up_threshold = entry_price * 1.005  # 0.5% gap-up threshold
+            gap_down_threshold = entry_price * 0.995  # 0.5% gap-down threshold
+            
+            if exit_price > gap_up_threshold:
+                # Gap-up: Exit at open with profit
                 corrected["Exit Time"] = "09:15"  # Gap-up open
                 corrected["Exit Reason"] = "BTST_GapUp"
+            elif exit_price < gap_down_threshold:
+                # Gap-down: Exit at open with loss (cut losses quickly)
+                corrected["Exit Time"] = "09:15"  # Gap-down open
+                corrected["Exit Reason"] = "BTST_GapDown"
             else:
+                # No significant gap, sell at entry price
                 corrected["Exit Time"] = "09:25"  # No gap, sell at same price
                 corrected["Exit Reason"] = "BTST_NoGap"
                 # Adjust exit price to entry price if no gap

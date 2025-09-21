@@ -118,14 +118,24 @@ def compute_entry_exit_for_row(
                 open_ts = intraday_exit.index[0]
                 open_price = float(intraday_exit.iloc[0]["open"])  # type: ignore
                 
-                # Check for gap-up (0.5% threshold)
-                if open_price > entry_price * 1.005:
+                # Check for gap-up or gap-down (0.5% threshold)
+                gap_up_threshold = entry_price * 1.005
+                gap_down_threshold = entry_price * 0.995
+                
+                if open_price > gap_up_threshold:
+                    # Gap-up: Exit at open with profit
                     exit_ts = open_ts
                     exit_price = open_price
                     exit_reason = "BTST_GapUp"
                     exit_time_str = "09:15"
+                elif open_price < gap_down_threshold:
+                    # Gap-down: Exit at open with loss (cut losses quickly)
+                    exit_ts = open_ts
+                    exit_price = open_price
+                    exit_reason = "BTST_GapDown"
+                    exit_time_str = "09:15"
                 else:
-                    # No gap, sell at entry price
+                    # No significant gap, sell at entry price
                     exit_ts = open_ts
                     exit_price = entry_price
                     exit_reason = "BTST_NoGap"

@@ -61,7 +61,7 @@ def compute_entry_exit_for_row(
         # Regular trades: Exit at market close
         exit_ts = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(15, 30)))
         exit_time_str = "15:30"
-        exit_reason = "Time"
+    exit_reason = "Time"
     
     exit_price: Optional[float] = None
 
@@ -147,47 +147,43 @@ def compute_entry_exit_for_row(
                 exit_time_str = "09:25"
         else:
             # Regular trades: Exit at market close
-            day_start = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(9, 0)))
-            day_end = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(15, 30)))
-            intraday_exit = kite.fetch_ohlc(token=token, interval=intraday_interval, start=day_start, end=day_end, tz=tz)
-            if not intraday_exit.empty:
-                exit_ts = intraday_exit.index[-1]
-                exit_price = float(intraday_exit.iloc[-1]["close"])  # type: ignore
-                exit_time_str = exit_ts.astimezone(tz).strftime("%H:%M")
+        day_start = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(9, 0)))
+        day_end = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(15, 30)))
+        intraday_exit = kite.fetch_ohlc(token=token, interval=intraday_interval, start=day_start, end=day_end, tz=tz)
+        if not intraday_exit.empty:
+            exit_ts = intraday_exit.index[-1]
+            exit_price = float(intraday_exit.iloc[-1]["close"])  # type: ignore
+            exit_time_str = exit_ts.astimezone(tz).strftime("%H:%M")
+        else:
+            # Fallback to daily close if no intraday data available
+            daily_start = tz.localize(dt.datetime.combine(entry_dt_local.date() - dt.timedelta(days=10), dt.time(9, 0)))
+            daily_end = tz.localize(dt.datetime.combine(exit_trade_date + dt.timedelta(days=5), dt.time(15, 30)))
+            daily = kite.fetch_ohlc(token=token, interval="day", start=daily_start, end=daily_end, tz=tz)
+            if daily.empty:
+                raise ValueError(f"No daily data for {row.stock}")
+            daily_dates = pd.Index([ts.astimezone(tz).date() for ts in daily.index])
+            candidate_positions = [i for i, d in enumerate(daily_dates) if d >= exit_trade_date]
+            if not candidate_positions:
+                exit_pos = len(daily) - 1
             else:
-                # Fallback to daily close if no intraday data available
-                daily_start = tz.localize(dt.datetime.combine(entry_dt_local.date() - dt.timedelta(days=10), dt.time(9, 0)))
-                daily_end = tz.localize(dt.datetime.combine(exit_trade_date + dt.timedelta(days=5), dt.time(15, 30)))
-                daily = kite.fetch_ohlc(token=token, interval="day", start=daily_start, end=daily_end, tz=tz)
-                if daily.empty:
-                    raise ValueError(f"No daily data for {row.stock}")
-                daily_dates = pd.Index([ts.astimezone(tz).date() for ts in daily.index])
-                candidate_positions = [i for i, d in enumerate(daily_dates) if d >= exit_trade_date]
-                if not candidate_positions:
-                    exit_pos = len(daily) - 1
-                else:
-                    exit_pos = candidate_positions[0]
-                exit_ts = daily.index[exit_pos]
-                exit_price = float(daily.iloc[exit_pos]["close"])  # type: ignore
-                exit_ts_local = exit_ts.astimezone(tz)
-                exit_time_str = "15:30" if (exit_ts_local.hour == 0 and exit_ts_local.minute == 0) else exit_ts_local.strftime("%H:%M")
+                exit_pos = candidate_positions[0]
+            exit_ts = daily.index[exit_pos]
+            exit_price = float(daily.iloc[exit_pos]["close"])  # type: ignore
+            exit_ts_local = exit_ts.astimezone(tz)
+            exit_time_str = "15:30" if (exit_ts_local.hour == 0 and exit_ts_local.minute == 0) else exit_ts_local.strftime("%H:%M")
     else:
         exit_time_str = exit_ts.astimezone(tz).strftime("%H:%M")
 
-    # Calculate return percentage with error handling
-    if entry_price and exit_price and entry_price > 0:
-        ret_pct = (exit_price - entry_price) / entry_price * 100.0
-    else:
-        ret_pct = 0.0
+    ret_pct = (exit_price - entry_price) / entry_price * 100.0
 
     return {
         "Stock": row.stock,
         "Entry Date": row.entry_date.isoformat(),
         "Entry Time": row.entry_time.strftime("%H:%M"),
-        "Entry Price": round(entry_price, 4) if entry_price else 0.0,
+        "Entry Price": round(entry_price, 4),
         "Exit Date": exit_ts.astimezone(tz).date().isoformat(),
         "Exit Time": exit_time_str,
-        "Exit Price": round(exit_price, 4) if exit_price else 0.0,
+        "Exit Price": round(exit_price, 4),
         "Return %": round(ret_pct, 4),
         "Exit Reason": exit_reason,
     }
@@ -238,12 +234,12 @@ def run_backtest_from_csv(
                     "Stock": r.stock,
                     "Entry Date": r.entry_date.isoformat(),
                     "Entry Time": r.entry_time.strftime("%H:%M"),
-                    "Entry Price": 0.0,
-                    "Exit Date": r.entry_date.isoformat(),
-                    "Exit Time": "15:30",
-                    "Exit Price": 0.0,
-                    "Return %": 0.0,
-                    "Exit Reason": "Error",
+                    "Entry Price": None,
+                    "Exit Date": None,
+                    "Exit Time": None,
+                    "Exit Price": None,
+                    "Return %": None,
+                    "Exit Reason": None,
                     "Error": str(e),
                 }
             )
@@ -318,7 +314,7 @@ def run_backtest_from_csv(
         except Exception as e:
             # If audit fails, continue with original dataframe but log the error
             print(f"Trade audit failed: {e}")
-    
+
     preferred = ["Stock", "Entry Date", "Entry Time", "Entry Price", "Exit Date", "Exit Time", "Exit Price", "Return %", "Exit Reason"]
     remaining = [c for c in df.columns if c not in preferred]
     return df[preferred + remaining]

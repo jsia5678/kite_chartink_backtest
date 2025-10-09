@@ -22,173 +22,6 @@ templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
-# ============================================
-# SETUP & AUTHENTICATION ROUTES
-# ============================================
-
-@app.get("/", response_class=HTMLResponse)
-async def root(request: Request):
-    """
-    Root route - check if API keys are configured, if not redirect to setup
-    """
-    # Check if credentials exist in cookies or environment
-    has_api_key = bool(
-        os.environ.get("KITE_API_KEY") or 
-        request.cookies.get("kite_api_key")
-    )
-    has_access_token = bool(
-        os.environ.get("KITE_ACCESS_TOKEN") or 
-        request.cookies.get("kite_access_token")
-    )
-    
-    # If credentials not found, redirect to setup
-    if not (has_api_key and has_access_token):
-        return RedirectResponse(url="/setup", status_code=302)
-    
-    # Otherwise show the main dashboard
-    return templates.TemplateResponse("index.html", {"request": request})
-
-
-@app.get("/setup", response_class=HTMLResponse)
-async def setup_page(request: Request):
-    """Show the API setup page"""
-    return templates.TemplateResponse("setup.html", {
-        "request": request,
-        "saved_api_key": request.cookies.get("kite_api_key", ""),
-        "saved_access_token": request.cookies.get("kite_access_token", ""),
-        "saved_pplx_key": request.cookies.get("pplx_api_key", ""),
-        "saved_exchange": request.cookies.get("exchange", "NSE"),
-        "saved_timezone": request.cookies.get("timezone", "Asia/Kolkata"),
-    })
-
-
-@app.post("/setup", response_class=HTMLResponse)
-async def setup_submit(
-    request: Request,
-    api_key: str = Form(...),
-    api_secret: str = Form(...),
-    access_token: str = Form(...),
-    pplx_api_key: Optional[str] = Form(default=None),
-    exchange: str = Form(default="NSE"),
-    timezone: str = Form(default="Asia/Kolkata"),
-):
-    """
-    Handle API setup form submission and store credentials in cookies
-    """
-    try:
-        # Validate that required fields are not empty
-        if not api_key or not api_secret or not access_token:
-            return templates.TemplateResponse("setup.html", {
-                "request": request,
-                "error": "API Key, API Secret, and Access Token are required",
-                "saved_api_key": api_key,
-                "saved_access_token": access_token,
-                "saved_pplx_key": pplx_api_key,
-                "saved_exchange": exchange,
-                "saved_timezone": timezone,
-            })
-        
-        # Create response redirecting to main page
-        response = RedirectResponse(url="/dashboard", status_code=302)
-        
-        # Store credentials in secure cookies (httponly for security)
-        response.set_cookie(
-            key="kite_api_key",
-            value=api_key.strip(),
-            max_age=86400,  # 24 hours
-            httponly=True,
-            samesite="lax"
-        )
-        response.set_cookie(
-            key="kite_api_secret",
-            value=api_secret.strip(),
-            max_age=86400,
-            httponly=True,
-            samesite="lax"
-        )
-        response.set_cookie(
-            key="kite_access_token",
-            value=access_token.strip(),
-            max_age=86400,
-            httponly=True,
-            samesite="lax"
-        )
-        
-        # Store optional Perplexity API key
-        if pplx_api_key and pplx_api_key.strip():
-            response.set_cookie(
-                key="pplx_api_key",
-                value=pplx_api_key.strip(),
-                max_age=86400,
-                httponly=True,
-                samesite="lax"
-            )
-        
-        # Store preferences
-        response.set_cookie(key="exchange", value=exchange, max_age=86400)
-        response.set_cookie(key="timezone", value=timezone, max_age=86400)
-        
-        # Also set environment variables for this session
-        os.environ["KITE_API_KEY"] = api_key.strip()
-        os.environ["KITE_API_SECRET"] = api_secret.strip()
-        os.environ["KITE_ACCESS_TOKEN"] = access_token.strip()
-        if pplx_api_key and pplx_api_key.strip():
-            os.environ["PPLX_API_KEY"] = pplx_api_key.strip()
-        
-        return response
-        
-    except Exception as e:
-        return templates.TemplateResponse("setup.html", {
-            "request": request,
-            "error": f"Setup failed: {str(e)}",
-            "saved_api_key": api_key,
-            "saved_access_token": access_token,
-            "saved_pplx_key": pplx_api_key,
-            "saved_exchange": exchange,
-            "saved_timezone": timezone,
-        })
-
-
-@app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard(request: Request):
-    """Main dashboard - only accessible after setup"""
-    # Ensure credentials from cookies are set in environment
-    api_key = request.cookies.get("kite_api_key") or os.environ.get("KITE_API_KEY")
-    api_secret = request.cookies.get("kite_api_secret") or os.environ.get("KITE_API_SECRET")
-    access_token = request.cookies.get("kite_access_token") or os.environ.get("KITE_ACCESS_TOKEN")
-    
-    if not (api_key and api_secret and access_token):
-        return RedirectResponse(url="/setup", status_code=302)
-    
-    # Set environment variables from cookies if not already set
-    if api_key and not os.environ.get("KITE_API_KEY"):
-        os.environ["KITE_API_KEY"] = api_key
-    if api_secret and not os.environ.get("KITE_API_SECRET"):
-        os.environ["KITE_API_SECRET"] = api_secret
-    if access_token and not os.environ.get("KITE_ACCESS_TOKEN"):
-        os.environ["KITE_ACCESS_TOKEN"] = access_token
-    
-    # Set optional Perplexity key
-    pplx_key = request.cookies.get("pplx_api_key")
-    if pplx_key and not os.environ.get("PPLX_API_KEY"):
-        os.environ["PPLX_API_KEY"] = pplx_key
-    
-    return templates.TemplateResponse("index.html", {"request": request})
-
-
-@app.get("/logout")
-async def logout():
-    """Clear all credentials and redirect to setup"""
-    response = RedirectResponse(url="/setup", status_code=302)
-    response.delete_cookie("kite_api_key")
-    response.delete_cookie("kite_api_secret")
-    response.delete_cookie("kite_access_token")
-    response.delete_cookie("pplx_api_key")
-    response.delete_cookie("exchange")
-    response.delete_cookie("timezone")
-    return response
-
-
 @app.post("/backtest")
 def _to_opt_float(val: Optional[str]) -> Optional[float]:
     try:
@@ -674,15 +507,15 @@ async def ui_ai_strategy(
             kite = KiteService.from_env()
             
             out = compute_entry_exit_batch(
-                kite=kite,
+                            kite=kite,
                 rows=rows,
-                num_days=days,
-                exchange=exchange,
-                tz=_pytz.timezone(tz),
-                sl_pct=_to_opt_float(sl_pct),
-                tp_pct=_to_opt_float(tp_pct),
-                breakeven_profit_pct=_to_opt_float(breakeven_profit_pct),
-                breakeven_at_sl=bool(breakeven_at_sl),
+                            num_days=days,
+                            exchange=exchange,
+                            tz=_pytz.timezone(tz),
+                            sl_pct=_to_opt_float(sl_pct),
+                            tp_pct=_to_opt_float(tp_pct),
+                            breakeven_profit_pct=_to_opt_float(breakeven_profit_pct),
+                            breakeven_at_sl=bool(breakeven_at_sl),
             )
             import pandas as _pd
             df = _pd.DataFrame(out)

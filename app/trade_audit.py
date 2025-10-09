@@ -121,24 +121,24 @@ class TradeAuditor:
                 "audit_status": "PASS"
             }
             
-            # Standard validation for other strategies
-            # Validate entry timing
-            entry_violation = self._validate_entry_timing(entry_time, strategy_rules)
-            if entry_violation:
-                audit_result["violations"].append(entry_violation)
-                audit_result["audit_status"] = "FAIL"
-            
-            # Validate exit timing
-            exit_violation = self._validate_exit_timing(exit_time, strategy_rules, holding_days)
-            if exit_violation:
-                audit_result["violations"].append(exit_violation)
-                audit_result["audit_status"] = "FAIL"
-            
-            # Validate holding period
-            holding_violation = self._validate_holding_period(holding_days, strategy_rules, num_days_param)
-            if holding_violation:
-                audit_result["violations"].append(holding_violation)
-                audit_result["audit_status"] = "FAIL"
+                # Standard validation for other strategies
+                # Validate entry timing
+                entry_violation = self._validate_entry_timing(entry_time, strategy_rules)
+                if entry_violation:
+                    audit_result["violations"].append(entry_violation)
+                    audit_result["audit_status"] = "FAIL"
+                
+                # Validate exit timing
+                exit_violation = self._validate_exit_timing(exit_time, strategy_rules, holding_days)
+                if exit_violation:
+                    audit_result["violations"].append(exit_violation)
+                    audit_result["audit_status"] = "FAIL"
+                
+                # Validate holding period
+                holding_violation = self._validate_holding_period(holding_days, strategy_rules, num_days_param)
+                if holding_violation:
+                    audit_result["violations"].append(holding_violation)
+                    audit_result["audit_status"] = "FAIL"
             
             # Validate exit reason
             exit_reason_violation = self._validate_exit_reason(exit_reason, strategy_type, entry_price, exit_price)

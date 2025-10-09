@@ -1,185 +1,133 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Backtest Results | Kite Chartink Backtest</title>
-  <link rel="stylesheet" href="/static/styles.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Backtest results</title>
+    <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
-  <!-- Header -->
-  <header class="header">
-    <div class="header-content">
-      <a href="/dashboard" class="logo">
-        <div class="logo-icon">📈</div>
-        <span>Backtest Results</span>
-      </a>
-      <nav class="nav-actions">
-        <button class="btn btn-secondary" onclick="window.location.href='/dashboard'">
-          🔙 New Backtest
-        </button>
-        <a href="/setup" class="settings-link" title="API Settings">
-          ⚙️
-        </a>
+    <header class="site-header">
+      <div class="container header-inner">
+        <div class="brand"><div class="logo-dot"></div><span>Backtest Results</span></div>
+        <nav class="header-actions">
+          <a class="btn secondary" href="/">New backtest</a>
         </nav>
       </div>
     </header>
-
-  <!-- Main Content -->
     <main class="container">
-    
-    <!-- Alert Messages -->
       {% if error %}
-    <div class="alert alert-danger">
-      <span style="font-size: 1.5rem;">⚠️</span>
-      <div>
-        <strong>Error:</strong> {{ error }}
-      </div>
-    </div>
+      <div class="banner" style="background:#3a0f0f;border-color:#7f1d1d;color:#fecaca">Error: {{ error }}</div>
       {% endif %}
 
       {% if ai_prompt %}
-    <div class="alert alert-info">
-      <span style="font-size: 1.5rem;">🤖</span>
-      <div>
-        <strong>AI Strategy:</strong> {{ ai_prompt }}
-      </div>
-    </div>
+      <div class="banner">AI Strategy prompt used: <em>{{ ai_prompt }}</em></div>
+      {% endif %}
+      {% if defaults and (defaults.from_date or defaults.to_date) %}
+      <div class="banner" style="opacity:0.85">Date filter applied: {{ defaults.from_date or '...' }} → {{ defaults.to_date or '...' }}</div>
       {% endif %}
 
-    <!-- Key Metrics Dashboard -->
-    {% if stats %}
-    <section class="fade-in">
-      <h2 style="font-size: 1.75rem; margin-bottom: 1.5rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
-        <span>📊</span> Performance Overview
-      </h2>
-      
-      <div class="metrics-grid">
-        <div class="metric-card">
-          <div class="metric-label">Total Trades</div>
-          <div class="metric-value">{{ stats['total_trades'] }}</div>
-        </div>
-        
-        <div class="metric-card">
-          <div class="metric-label">Win Rate</div>
-          <div class="metric-value {% if stats['win_rate_pct'] >= 50 %}positive{% else %}negative{% endif %}">
-            {{ '%.2f'|format(stats['win_rate_pct']) }}%
-          </div>
-        </div>
-        
-        <div class="metric-card">
-          <div class="metric-label">Avg Return</div>
-          <div class="metric-value {% if stats['avg_ret_pct'] > 0 %}positive{% else %}negative{% endif %}">
-            {{ '%.2f'|format(stats['avg_ret_pct']) }}%
-          </div>
+      <div class="layout-2col">
+        <aside class="sidebar">
+          <div class="card">
+            <h2>Quick Re-run</h2>
+            <form id="rerun-form">
+              <input type="hidden" name="csv_path" value="{{ csv_path }}" />
+              <div class="grid">
+                <label>Days
+                  <input type="number" name="days" value="{{ (defaults and defaults.days) or 5 }}" min="1" />
+                </label>
+                <label>SL %
+                  <input type="number" name="sl_pct" step="0.01" value="{{ (defaults and defaults.sl_pct) or '' }}" />
+                </label>
+                <label>TP %
+                  <input type="number" name="tp_pct" step="0.01" value="{{ (defaults and defaults.tp_pct) or '' }}" />
+                </label>
               </div>
-        
-        <div class="metric-card">
-          <div class="metric-label">Max Gain</div>
-          <div class="metric-value positive">
-            {{ '%.2f'|format(stats['max_dd_pct']) }}%
+              <div class="grid">
+                <label><input type="checkbox" name="cap_small" value="1" checked /> Small</label>
+                <label><input type="checkbox" name="cap_mid" value="1" checked /> Mid</label>
+                <label><input type="checkbox" name="cap_large" value="1" checked /> Large</label>
               </div>
+              <input type="hidden" name="exchange" value="{{ (defaults and defaults.exchange) or 'NSE' }}" />
+              <input type="hidden" name="tz" value="{{ (defaults and defaults.tz) or 'Asia/Kolkata' }}" />
+              <input type="hidden" name="breakeven_profit_pct" value="{{ (defaults and defaults.breakeven_profit_pct) or '' }}" />
+              {% if defaults and defaults.breakeven_at_sl %}
+              <input type="hidden" name="breakeven_at_sl" value="1" />
+              {% endif %}
+              <div style="margin-top:12px">
+                <button class="btn primary" type="submit">Re-run</button>
               </div>
-        
-        <div class="metric-card">
-          <div class="metric-label">Compounded Return</div>
-          <div class="metric-value {% if stats['compound_ret_pct'] > 0 %}positive{% else %}negative{% endif %}">
-            {{ '%.2f'|format(stats['compound_ret_pct']) }}%
-          </div>
+            </form>
           </div>
 
-        <div class="metric-card">
-          <div class="metric-label">Max Drawdown</div>
-          <div class="metric-value negative">
-            {{ '%.2f'|format(stats['max_dd_pct']) }}%
-          </div>
+          <div class="card" id="warnings-card" style="display:none">
+            <h2>Warnings</h2>
+            <ul id="warnings-list"></ul>
           </div>
 
-        <div class="metric-card">
-          <div class="metric-label">Risk/Reward</div>
-          <div class="metric-value">
-            {{ '%.2f'|format(stats['r_r']) }}
-          </div>
+          <div class="card">
+            <h2>Export</h2>
+            <div class="grid">
+              <button class="btn secondary" id="export-csv">CSV</button>
+              <button class="btn secondary" id="export-notes">AI Notes</button>
             </div>
-        
-        <div class="metric-card">
-          <div class="metric-label">Expectancy</div>
-          <div class="metric-value {% if stats['expectancy_pct'] > 0 %}positive{% else %}negative{% endif %}">
-            {{ '%.2f'|format(stats['expectancy_pct']) }}%
           </div>
-        </div>
-        
-        <div class="metric-card">
-          <div class="metric-label">Sharpe Ratio</div>
-          <div class="metric-value">
-            {{ '%.2f'|format(stats['sharpe_ratio']) }}
-          </div>
+        </aside>
+
+        <section class="content">
+          <div class="tabs">
+            <button class="tab-btn active" data-tab="overview">Overview</button>
+            <button class="tab-btn" data-tab="trades">Trades</button>
+            <button class="tab-btn" data-tab="entry">Entry Timing</button>
+            <button class="tab-btn" data-tab="caps">Cap Buckets</button>
           </div>
 
-        <div class="metric-card">
-          <div class="metric-label">Calmar Ratio</div>
-          <div class="metric-value">
-            {{ '%.2f'|format(stats['calmar_ratio']) }}
-          </div>
-        </div>
-      </div>
+          <section class="tab-panel active" id="tab-overview">
+      {% if stats %}
+      <section class="metrics">
+              <div class="metric kpi" data-kpi="trades"><div class="k">Trades</div><div class="v">{{ '%.0f'|format(stats['trades']) }}</div></div>
+              <div class="metric kpi" data-kpi="win"><div class="k">Win rate</div><div class="v">{{ '%.2f'|format(stats['win_rate_pct']) }}%</div></div>
+              <div class="metric kpi" data-kpi="return"><div class="k">Compounded return</div><div class="v">{{ '%.2f'|format(stats.get('compounded_return_pct', stats['total_return_pct'])) }}%</div></div>
+              <div class="metric kpi" data-kpi="drawdown"><div class="k">Max DD</div><div class="v">{{ '%.2f'|format(stats['max_drawdown_pct']) }}%</div></div>
+        <div class="metric"><div class="k">R:R</div><div class="v">{{ '%.2f'|format(stats['risk_reward']) }}</div></div>
+              <div class="metric"><div class="k">Expectancy</div><div class="v">{{ '%.2f'|format(stats['expectancy_pct']) }}%</div></div>
+              <div class="metric"><div class="k">Calmar</div><div class="v">{{ '%.2f'|format(stats['calmar_ratio']) }}</div></div>
       </section>
       {% endif %}
 
-    <!-- Trade Audit Summary -->
       {% if audit_summary %}
-    <section class="fade-in" style="margin-top: 2rem;">
-      <h2 style="font-size: 1.75rem; margin-bottom: 1.5rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
-        <span>🔍</span> Trade Audit Summary
-      </h2>
-      
+      <section class="audit-summary" style="margin-top: 16px;">
         <div class="card">
-        <div class="metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
-          <div>
-            <div class="metric-label">Strategy Type</div>
-            <div style="margin-top: 0.5rem;">
+          <h3>🔍 Trade Audit Summary</h3>
+          <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
+            <div class="metric">
+              <div class="k">Strategy Types</div>
+              <div class="v">
                 {% for strategy, count in audit_summary.strategy_distribution.items() %}
-                <span class="badge badge-primary">{{ strategy }}: {{ count }}</span>
+                  <span class="badge">{{ strategy }}: {{ count }}</span>
                 {% endfor %}
               </div>
-          </div>
-          
-          <div>
-            <div class="metric-label">Pass Rate</div>
-            <div class="metric-value" style="font-size: 1.5rem; {% if audit_summary.pass_rate >= 70 %}color: var(--success);{% elif audit_summary.pass_rate >= 50 %}color: var(--warning);{% else %}color: var(--danger);{% endif %}">
-              {{ '%.1f'|format(audit_summary.pass_rate) }}%
+            </div>
+            <div class="metric">
+              <div class="k">Pass Rate</div>
+              <div class="v">{{ '%.1f'|format(audit_summary.pass_rate) }}%</div>
+            </div>
+            <div class="metric">
+              <div class="k">Failed Trades</div>
+              <div class="v">{{ audit_summary.failed_trades }}/{{ audit_summary.total_trades }}</div>
+            </div>
+            <div class="metric">
+              <div class="k">Called Trades</div>
+              <div class="v">{{ audit_summary.called_trades }}</div>
             </div>
           </div>
-          
-          <div>
-            <div class="metric-label">Failed Trades</div>
-            <div class="metric-value" style="font-size: 1.5rem;">
-              {{ audit_summary.failed_trades }}/{{ audit_summary.total_trades }}
-            </div>
-          </div>
-          
-          <div>
-            <div class="metric-label">Called Trades</div>
-            <div class="metric-value" style="font-size: 1.5rem;">
-              {{ audit_summary.called_trades }}
-            </div>
-          </div>
-        </div>
-        
           {% if audit_summary.common_violations %}
-        <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
-          <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--danger);">
-            ⚠️ Common Violations
-          </h4>
-          <ul style="list-style: none; padding: 0;">
+          <div style="margin-top: 12px;">
+            <h4>Common Violations:</h4>
+            <ul style="margin: 8px 0; padding-left: 20px;">
               {% for violation, count in audit_summary.common_violations[:3] %}
-            <li style="padding: 0.5rem 0; color: var(--text-secondary); font-size: 0.9rem;">
-              <span class="badge badge-danger" style="margin-right: 0.5rem;">{{ count }}x</span>
-              {{ violation }}
-            </li>
+              <li style="margin: 4px 0; font-size: 0.9em; color: #dc2626;">{{ violation }} ({{ count }} times)</li>
               {% endfor %}
             </ul>
           </div>
@@ -188,169 +136,39 @@
       </section>
       {% endif %}
 
-    <!-- Equity Curve Chart -->
-    {% if equity %}
-    <section class="fade-in" style="margin-top: 2rem;">
-      <h2 style="font-size: 1.75rem; margin-bottom: 1.5rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
-        <span>📉</span> Equity Curve
-      </h2>
-      
-      <div class="card">
-        <div class="chart-container">
-          <canvas id="equity-chart"></canvas>
-        </div>
-      </div>
-    </section>
-    {% endif %}
-
-    <!-- Insights & Quick Actions -->
-    <div style="display: grid; grid-template-columns: 1fr 400px; gap: 2rem; margin-top: 2rem;">
-      
-      <!-- AI Insights -->
-      <section class="fade-in">
-        <h2 style="font-size: 1.75rem; margin-bottom: 1.5rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
-          <span>💡</span> AI Insights
-        </h2>
-        
-        <div class="card">
-          <div id="ai-summary" style="min-height: 150px;">
-            <div class="loading" style="margin: 2rem auto; display: block;"></div>
-            <p style="text-align: center; color: var(--text-muted); margin-top: 1rem;">
-              Analyzing your backtest results...
-            </p>
-          </div>
-        </div>
-
-        <!-- AI Chat Assistant -->
-        <div class="card" style="margin-top: 1.5rem;">
-          <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-            <span>🤖</span> Ask AI Assistant
-          </h3>
-          
-          <div id="ai-messages" style="max-height: 300px; overflow-y: auto; margin-bottom: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: var(--radius-md);">
-            <!-- Messages will appear here -->
-          </div>
-          
-          <form id="ai-chat-form" style="display: flex; gap: 0.5rem;">
-            <input type="text" id="ai-input" placeholder="Ask about risks, patterns, improvements..." style="flex: 1;">
-            <button type="submit" class="btn btn-primary">Send</button>
-          </form>
-        </div>
-      </section>
-
-      <!-- Quick Re-run & Export -->
-      <aside class="fade-in">
-        <!-- Quick Re-run -->
-        <div class="card">
-          <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-            <span>⚡</span> Quick Re-run
-          </h3>
-          
-          <form id="rerun-form" method="POST" action="/ui/rerun">
-            <input type="hidden" name="csv_path" value="{{ csv_path }}">
-            
-            <div class="form-group">
-              <label for="days">Holding Days</label>
-              <input type="number" id="days" name="days" value="{{ (defaults and defaults.days) or 5 }}" min="1">
-            </div>
-            
-            <div class="grid grid-2">
-              <div class="form-group">
-                <label for="sl_pct">SL %</label>
-                <input type="number" id="sl_pct" name="sl_pct" step="0.01" value="{{ (defaults and defaults.sl_pct) or '' }}">
-              </div>
-              <div class="form-group">
-                <label for="tp_pct">TP %</label>
-                <input type="number" id="tp_pct" name="tp_pct" step="0.01" value="{{ (defaults and defaults.tp_pct) or '' }}">
-              </div>
+            <div class="card raise" style="padding:0;margin-top:12px">
+              <canvas id="equityChart" height="140"></canvas>
             </div>
 
-            <div class="form-group">
-              <label>Market Cap</label>
-              <div class="flex gap-2">
-                <div class="checkbox-group">
-                  <input type="checkbox" id="cap_small" name="cap_small" value="1" checked>
-                  <label for="cap_small">Small</label>
-                </div>
-                <div class="checkbox-group">
-                  <input type="checkbox" id="cap_mid" name="cap_mid" value="1" checked>
-                  <label for="cap_mid">Mid</label>
-                </div>
-                <div class="checkbox-group">
-                  <input type="checkbox" id="cap_large" name="cap_large" value="1" checked>
-                  <label for="cap_large">Large</label>
-                </div>
-              </div>
+            <div class="card" id="ai-summary">
+              <h2>AI Summary</h2>
+              <div id="ai-summary-text" class="sub">Generating summary...</div>
             </div>
-            
-            <button type="submit" class="btn btn-primary" style="width: 100%;">
-              🔄 Re-run Backtest
-            </button>
-          </form>
-        </div>
+          </section>
 
-        <!-- Export Options -->
-        <div class="card" style="margin-top: 1.5rem;">
-          <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-            <span>💾</span> Export Results
-          </h3>
-          
-          <form id="export-form" method="POST" action="/ui/export_csv">
-            <input type="hidden" name="csv_path" value="{{ csv_path }}">
-            <input type="hidden" name="days" value="{{ (defaults and defaults.days) or 5 }}">
-            <input type="hidden" name="sl_pct" value="{{ (defaults and defaults.sl_pct) or '' }}">
-            <input type="hidden" name="tp_pct" value="{{ (defaults and defaults.tp_pct) or '' }}">
-            
-            <button type="submit" class="btn btn-success" style="width: 100%; margin-bottom: 0.75rem;">
-              📄 Download CSV
-            </button>
-          </form>
-          
-          <form id="ai-notes-form" method="POST" action="/ui/export_ai_notes">
-            <input type="hidden" name="bt_json" id="bt-json-input">
-            <button type="submit" class="btn btn-secondary" style="width: 100%;">
-              📝 Download AI Notes
-            </button>
-          </form>
-        </div>
-
-        <!-- Filter & Sort Trades -->
-        <div class="card" style="margin-top: 1.5rem;">
-          <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-            <span>🔎</span> Filter Trades
-          </h3>
-          
-          <div class="form-group">
-            <label for="filter">Exit Reason</label>
-            <select id="filter">
-              <option value="">All Trades</option>
-              <option value="tp">Take Profit</option>
-              <option value="sl">Stop Loss</option>
-              <option value="time">Time Exit</option>
+          <section class="tab-panel" id="tab-trades">
+            <div class="card">
+              <div class="grid">
+                <label>Filter
+                  <select id="trade-filter">
+                    <option value="all">All trades</option>
+                    <option value="winners">Winners</option>
+                    <option value="losers">Losers</option>
+                    <option value="tp">TP hit</option>
+                    <option value="sl">SL hit</option>
             </select>
-          </div>
-          
-          <div class="form-group">
-            <label for="sort">Sort By</label>
-            <select id="sort">
-              <option value="">Original Order</option>
-              <option value="ret_desc">Return (High → Low)</option>
-              <option value="ret_asc">Return (Low → High)</option>
+          </label>
+                <label>Sort by
+                  <select id="trade-sort">
+                    <option value="none">None</option>
+                    <option value="ret_desc">Return % (desc)</option>
+                    <option value="ret_asc">Return % (asc)</option>
             </select>
+          </label>
       </div>
       </div>
-      </aside>
-    </div>
-
-    <!-- Trades Table -->
-    {% if raw_data %}
-    <section class="fade-in" style="margin-top: 2rem;">
-      <h2 style="font-size: 1.75rem; margin-bottom: 1.5rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
-        <span>📋</span> All Trades
-      </h2>
-      
-      <div class="table-container">
-        <table>
+      <div class="table-wrap">
+              <table id="trades-table">
           <thead>
             <tr>
               <th>Stock</th>
@@ -362,238 +180,272 @@
               <th>Exit Price</th>
               <th>Exit Reason</th>
               <th>Return %</th>
-              <th>Strategy</th>
-              <th>Status</th>
+              <th>Error</th>
             </tr>
           </thead>
-          <tbody id="trades-table">
-            <!-- Populated by JavaScript -->
+                <tbody id="trades-body">
+            {% for row in rows %}
+            <tr>
+              <td>{{ row["Stock"] }}</td>
+              <td>{{ row["Entry Date"] }}</td>
+              <td>{{ row["Entry Time"] }}</td>
+              <td>{{ row["Entry Price"] }}</td>
+              <td>{{ row["Exit Date"] }}</td>
+              <td>{{ row.get("Exit Time", "") }}</td>
+              <td>{{ row["Exit Price"] }}</td>
+              <td>{{ row.get("Exit Reason", "") }}</td>
+              <td>{{ row["Return %"] }}</td>
+              <td>{{ row.get("Error", "") }}</td>
+            </tr>
+            {% endfor %}
           </tbody>
         </table>
       </div>
           </section>
-            {% endif %}
 
-    <!-- Warnings -->
-    <div id="warnings-card" class="card" style="margin-top: 2rem; display: none;">
-      <h3 style="color: var(--danger); margin-bottom: 1rem;">⚠️ Warnings & Errors</h3>
-      <ul id="warnings-list" style="list-style: none; padding: 0;">
-        <!-- Populated by JavaScript -->
-      </ul>
+          <section class="tab-panel" id="tab-entry">
+            {% if insights and insights.top_entry_times %}
+            <div class="card">
+              <h2>Best entry times</h2>
+              <canvas id="entryChart" height="140"></canvas>
+              <div class="table-wrap" style="margin-top:12px"><table>
+                <thead><tr><th>Entry Time</th><th>Trades</th><th>TP hits</th><th>TP hit %</th><th>Avg Return %</th></tr></thead>
+                <tbody>
+                  {% for t in insights.top_entry_times %}
+                  <tr>
+                    <td>{{ t.time }}</td><td>{{ t.trades }}</td><td>{{ t.tp_hits }}</td><td>{{ '%.2f'|format(t.tp_hit_rate) }}</td><td>{{ '%.2f'|format(t.avg_return) }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table></div>
+            </div>
+            {% endif %}
+          </section>
+
+          <section class="tab-panel" id="tab-caps">
+            {% if insights and insights.cap_performance %}
+            <div class="card">
+              <h2>Cap bucket performance</h2>
+              <canvas id="capChart" height="140"></canvas>
+            </div>
+            {% endif %}
+          </section>
+        </section>
+
+        <aside class="assistant-panel" id="assistant">
+          <div class="assistant-header">
+            <strong>AI Assistant</strong>
+            <button id="assistant-toggle">⇔</button>
+          </div>
+          <div id="assistant-body">
+            <div class="assistant-messages" id="assistant-messages"></div>
+            <form id="assistant-form">
+              <input type="text" id="assistant-input" placeholder="Ask about risks, caps, SL/TP..." />
+              <button class="btn primary" type="submit">Ask</button>
+            </form>
+          </div>
+        </aside>
       </div>
 
     </main>
-
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  {% if equity %}
+  <script id="equity-data" type="application/json">{{ equity | tojson | safe }}</script>
+  {% endif %}
+    <script id="backtest-json" type="application/json">{ "stats": {{ stats | default({}) | tojson | safe }}, "insights": {{ insights | default({}) | tojson | safe }}, "rows": {{ rows | default([]) | tojson | safe }} }</script>
   <script>
-    // Trade data from backend
-    const rawData = {{ raw_data|tojson|safe }};
-    const btJson = JSON.stringify({{ raw_data|tojson|safe }});
-    document.getElementById('bt-json-input').value = btJson;
+      // Tabs
+      document.querySelectorAll('.tab-btn').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+          document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
+          btn.classList.add('active');
+          document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+        });
+      });
 
-    // Equity Curve Chart
-    {% if equity %}
-    const equityData = {{ equity|tojson|safe }};
-    const ctx = document.getElementById('equity-chart').getContext('2d');
-    
+      // KPI coloring
+      (function(){
+        try{
+          var stats = JSON.parse(document.getElementById('backtest-json').textContent).stats || {};
+          function badge(el, good, warn){
+            var v = parseFloat(el.querySelector('.v').textContent);
+            el.classList.remove('kpi-good','kpi-warn','kpi-bad');
+            if (isNaN(v)) return;
+            if (good(v)) el.classList.add('kpi-good'); else if (warn(v)) el.classList.add('kpi-warn'); else el.classList.add('kpi-bad');
+          }
+          document.querySelectorAll('.metric.kpi').forEach(function(el){
+            var type = el.dataset.kpi;
+            if (type === 'win') badge(el, function(v){return v>=50}, function(v){return v>=40});
+            if (type === 'return') badge(el, function(v){return v>=20}, function(v){return v>=10});
+            if (type === 'drawdown') badge(el, function(v){return v<=8}, function(v){return v<=15});
+          });
+        }catch(e){}
+      })();
+
+      // Equity chart
+    (function(){
+      try{
+        var el = document.getElementById('equity-data');
+        if(!el) return;
+        var data = JSON.parse(el.textContent || '[]');
+        if(!data.length) return;
+        var ctx = document.getElementById('equityChart');
+        var labels = data.map(function(_, i){ return i + 1; });
         new Chart(ctx, {
           type: 'line',
-      data: {
-        labels: equityData.map(e => e.trade_num),
-        datasets: [{
-          label: 'Equity Curve',
-          data: equityData.map(e => e.equity_pct),
-          borderColor: 'rgb(99, 102, 241)',
-          backgroundColor: 'rgba(99, 102, 241, 0.1)',
-          borderWidth: 2,
-          fill: true,
-          tension: 0.4
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            display: false
-          },
-          tooltip: {
-            backgroundColor: 'rgba(15, 23, 42, 0.9)',
-            titleColor: '#f1f5f9',
-            bodyColor: '#cbd5e1',
-            borderColor: 'rgba(148, 163, 184, 0.1)',
-            borderWidth: 1,
-            padding: 12,
-            displayColors: false
-          }
-        },
-        scales: {
-          x: {
-            grid: {
-              color: 'rgba(148, 163, 184, 0.1)'
-            },
-            ticks: {
-              color: '#94a3b8'
-            }
-          },
-          y: {
-            grid: {
-              color: 'rgba(148, 163, 184, 0.1)'
-            },
-            ticks: {
-              color: '#94a3b8',
-              callback: function(value) {
-                return value + '%';
-              }
-            }
-          }
-        }
-      }
-    });
-    {% endif %}
+          data: { labels: labels, datasets: [{ label: 'Equity (Base=100)', data: data, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.15)', tension: 0.2, fill: true, pointRadius: 0 }]},
+          options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { grid: { color: 'rgba(255,255,255,0.06)' } }, y: { grid: { color: 'rgba(255,255,255,0.06)' } } } }
+        });
+      } catch(e) {}
+    })();
 
-    // Populate trades table
-    function renderTrades() {
-      const filterEl = document.getElementById('filter');
-      const sortEl = document.getElementById('sort');
-      const tbody = document.getElementById('trades-table');
-      
-      let data = [...rawData];
-      
-      // Filter
-      if (filterEl.value) {
-        const f = filterEl.value.toLowerCase();
-        data = data.filter(r => {
-          const reason = (r['Exit Reason'] || '').toLowerCase();
-          if (f === 'tp') return reason.includes('tp') || reason.includes('take');
-          if (f === 'sl') return reason.includes('sl') || reason.includes('stop');
-          if (f === 'time') return reason.includes('time');
+      // Entry timing chart
+      (function(){
+        try{
+          var data = (JSON.parse(document.getElementById('backtest-json').textContent).insights || {}).top_entry_times || [];
+          if(!data.length) return;
+          var ctx = document.getElementById('entryChart');
+          new Chart(ctx, {
+            type: 'bar',
+            data: { labels: data.map(function(d){return d.time;}), datasets: [
+              { label: 'TP hit %', data: data.map(function(d){return d.tp_hit_rate;}), backgroundColor: 'rgba(34,197,94,0.6)' },
+              { label: 'Avg Return %', data: data.map(function(d){return d.avg_return;}), backgroundColor: 'rgba(59,130,246,0.6)' }
+            ]},
+            options: { responsive: true, scales: { x: { stacked: true }, y: { beginAtZero: true } } }
+          });
+        }catch(e){}
+      })();
+
+      // Cap bucket chart
+      (function(){
+        try{
+          var caps = (JSON.parse(document.getElementById('backtest-json').textContent).insights || {}).cap_performance || [];
+          if(!caps.length) return;
+          var ctx = document.getElementById('capChart');
+          new Chart(ctx, {
+            type: 'bar',
+            data: { labels: caps.map(function(c){return c.cap;}), datasets: [
+              { label: 'Win %', data: caps.map(function(c){return c.win_rate;}), backgroundColor: 'rgba(34,197,94,0.6)' },
+              { label: 'Avg Return %', data: caps.map(function(c){return c.avg_return;}), backgroundColor: 'rgba(59,130,246,0.6)' }
+            ] },
+            options: { responsive: true, scales: { y: { beginAtZero: true } } }
+          });
+        }catch(e){}
+      })();
+
+      // Trades filters and warnings
+      (function(){
+        try{
+          var rows = JSON.parse(document.getElementById('backtest-json').textContent).rows || [];
+          var tbody = document.getElementById('trades-body');
+          var filterEl = document.getElementById('trade-filter');
+          var sortEl = document.getElementById('trade-sort');
+
+          function render(){
+            var data = rows.slice();
+            var f = filterEl.value;
+            if (f !== 'all'){
+              data = data.filter(function(r){
+                var ret = parseFloat(r['Return %'] || 0);
+                var reason = (r['Exit Reason'] || '').toLowerCase();
+                if (f==='winners') return ret>0;
+                if (f==='losers') return ret<0;
+                if (f==='tp') return reason.indexOf('tp')>=0 || reason.indexOf('take')>=0;
+                if (f==='sl') return reason.indexOf('sl')>=0 || reason.indexOf('stop')>=0;
                 return true;
               });
             }
-      
-      // Sort
-      if (sortEl.value === 'ret_desc') {
-        data.sort((a, b) => (parseFloat(b['Return %'] || 0) - parseFloat(a['Return %'] || 0)));
-      } else if (sortEl.value === 'ret_asc') {
-        data.sort((a, b) => (parseFloat(a['Return %'] || 0) - parseFloat(b['Return %'] || 0)));
-      }
-      
-      // Render
-      tbody.innerHTML = data.map(r => {
-        const ret = parseFloat(r['Return %'] || 0);
-        const retClass = ret > 0 ? 'text-success' : ret < 0 ? 'text-danger' : '';
-        return `<tr>
-          <td><strong>${r['Stock'] || ''}</strong></td>
-          <td>${r['Entry Date'] || ''}</td>
-          <td>${r['Entry Time'] || ''}</td>
-          <td>₹${r['Entry Price'] || ''}</td>
-          <td>${r['Exit Date'] || ''}</td>
-          <td>${r['Exit Time'] || ''}</td>
-          <td>₹${r['Exit Price'] || ''}</td>
-          <td><span class="badge badge-primary">${r['Exit Reason'] || ''}</span></td>
-          <td class="${retClass}"><strong>${ret.toFixed(2)}%</strong></td>
-          <td><span class="badge badge-info">${r['Strategy_Type'] || 'swing'}</span></td>
-          <td><span class="badge ${r['Audit_Status'] === 'PASS' ? 'badge-success' : 'badge-warning'}">${r['Audit_Status'] || 'N/A'}</span></td>
-        </tr>`;
+            var s = sortEl.value;
+            if (s==='ret_desc') data.sort(function(a,b){ return (parseFloat(b['Return %']||0) - parseFloat(a['Return %']||0)); });
+            if (s==='ret_asc') data.sort(function(a,b){ return (parseFloat(a['Return %']||0) - parseFloat(b['Return %']||0)); });
+
+            tbody.innerHTML = data.map(function(r){
+              return '<tr>'+
+                '<td>'+ (r['Stock']||'') +'</td>'+
+                '<td>'+ (r['Entry Date']||'') +'</td>'+
+                '<td>'+ (r['Entry Time']||'') +'</td>'+
+                '<td>'+ (r['Entry Price']||'') +'</td>'+
+                '<td>'+ (r['Exit Date']||'') +'</td>'+
+                '<td>'+ (r['Exit Time']||'') +'</td>'+
+                '<td>'+ (r['Exit Price']||'') +'</td>'+
+                '<td>'+ (r['Exit Reason']||'') +'</td>'+
+                '<td>'+ (r['Return %']||'') +'</td>'+
+                '<td>'+ (r['Error']||'') +'</td>'+
+              '</tr>';
             }).join('');
           }
 
-    renderTrades();
-    document.getElementById('filter').addEventListener('change', renderTrades);
-    document.getElementById('sort').addEventListener('change', renderTrades);
+          render();
+          filterEl.addEventListener('change', render);
+          sortEl.addEventListener('change', render);
 
-    // AI Summary
-    async function loadAISummary() {
-      try {
-        const fd = new FormData();
-        fd.append('bt_json', btJson);
-        const resp = await fetch('/ui/ai_summary', { method: 'POST', body: fd });
-        const text = await resp.text();
-        document.getElementById('ai-summary').innerHTML = `<p style="line-height: 1.8; color: var(--text-secondary);">${text}</p>`;
-      } catch (e) {
-        document.getElementById('ai-summary').innerHTML = '<p style="color: var(--text-muted);">AI summary unavailable</p>';
-      }
-    }
-    loadAISummary();
+          // Warnings
+          var warnings = Array.from(new Set(rows.map(function(r){ return (r['Error']||'').trim(); }).filter(Boolean)));
+          if (warnings.length){
+            document.getElementById('warnings-card').style.display = '';
+            var ul = document.getElementById('warnings-list');
+            warnings.forEach(function(w){
+              var li = document.createElement('li'); li.textContent = w; ul.appendChild(li);
+            });
+          }
+        }catch(e){}
+      })();
 
-    // AI Chat
-    const chatForm = document.getElementById('ai-chat-form');
-    const chatInput = document.getElementById('ai-input');
-    const chatMessages = document.getElementById('ai-messages');
-    
-    function addMessage(text, sender) {
-      const msgDiv = document.createElement('div');
-      msgDiv.style.cssText = `margin-bottom: 1rem; padding: 0.75rem; border-radius: var(--radius-md); ${sender === 'user' ? 'background: var(--primary); color: white; margin-left: 2rem;' : 'background: var(--bg-tertiary); margin-right: 2rem;'}`;
-      msgDiv.textContent = text;
-      chatMessages.appendChild(msgDiv);
-      chatMessages.scrollTop = chatMessages.scrollHeight;
-    }
-    
-    chatForm.addEventListener('submit', async (e) => {
+      // Quick rerun
+      (function(){
+        var form = document.getElementById('rerun-form');
+        if(!form) return;
+        form.addEventListener('submit', async function(e){
           e.preventDefault();
-      const question = chatInput.value.trim();
-      if (!question) return;
-      
-      addMessage(question, 'user');
-      chatInput.value = '';
-      
-      try {
-        const fd = new FormData();
-        fd.append('question', question);
-        fd.append('bt_json', btJson);
-        const resp = await fetch('/ui/ai_chat', { method: 'POST', body: fd });
-        const text = await resp.text();
-        addMessage(text, 'ai');
-      } catch (e) {
-        addMessage('AI unavailable. Please check your API key.', 'ai');
-      }
-    });
+          var fd = new FormData(form);
+          var resp = await fetch('/ui/rerun', { method: 'POST', body: fd });
+          var html = await resp.text(); document.open(); document.write(html); document.close();
+        });
+      })();
 
-    // Re-run form
-    document.getElementById('rerun-form').addEventListener('submit', async function(e) {
-      e.preventDefault();
-      const fd = new FormData(this);
-      const resp = await fetch('/ui/rerun', { method: 'POST', body: fd });
-      const html = await resp.text();
-      document.open();
-      document.write(html);
-      document.close();
-    });
+      // Assistant
+      (function(){
+        var toggle = document.getElementById('assistant-toggle');
+        var panel = document.getElementById('assistant');
+        toggle.addEventListener('click', function(){ panel.classList.toggle('collapsed'); });
 
-    // Warnings
-    const warnings = Array.from(new Set(rawData.map(r => (r['Error'] || '').trim()).filter(Boolean)));
-    if (warnings.length) {
-      document.getElementById('warnings-card').style.display = 'block';
-      const ul = document.getElementById('warnings-list');
-      warnings.forEach(w => {
-        const li = document.createElement('li');
-        li.style.cssText = 'padding: 0.5rem 0; color: var(--danger); font-size: 0.9rem;';
-        li.textContent = w;
-        ul.appendChild(li);
-      });
-    }
-
-    // Fade-in animations
-    const observerOptions = {
-      threshold: 0.1,
-      rootMargin: '0px 0px -50px 0px'
-    };
-
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.style.opacity = '1';
-          entry.target.style.transform = 'translateY(0)';
+        var btJson = document.getElementById('backtest-json').textContent;
+        async function aiSummary(){
+          try{
+            var fd = new FormData(); fd.append('bt_json', btJson);
+            var r = await fetch('/ui/ai_summary', { method: 'POST', body: fd });
+            var t = await r.text();
+            document.getElementById('ai-summary-text').textContent = t;
+          }catch(e){ document.getElementById('ai-summary-text').textContent = 'AI summary unavailable'; }
         }
-      });
-    }, observerOptions);
+        aiSummary();
 
-    document.querySelectorAll('.fade-in').forEach(el => {
-      el.style.opacity = '0';
-      el.style.transform = 'translateY(20px)';
-      el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
-      observer.observe(el);
-    });
+        var form = document.getElementById('assistant-form');
+        var input = document.getElementById('assistant-input');
+        var msgs = document.getElementById('assistant-messages');
+        function addMsg(text, who){
+          var div = document.createElement('div');
+          div.className = 'msg msg-'+who; div.textContent = text; msgs.appendChild(div); msgs.scrollTop = msgs.scrollHeight;
+        }
+        form.addEventListener('submit', async function(e){
+          e.preventDefault(); var q = input.value.trim(); if(!q) return; addMsg(q,'user'); input.value='';
+          try{ var fd = new FormData(); fd.append('question', q); fd.append('bt_json', btJson); var r = await fetch('/ui/ai_chat', { method:'POST', body: fd }); var t = await r.text(); addMsg(t,'ai'); }catch(e){ addMsg('AI unavailable','ai'); }
+        });
+      })();
+
+      // Export actions
+      (function(){
+        var btnCsv = document.getElementById('export-csv');
+        var btnNotes = document.getElementById('export-notes');
+        if(btnCsv){ btnCsv.addEventListener('click', function(){
+          var f = new FormData(document.getElementById('rerun-form'));
+          fetch('/ui/export_csv', { method:'POST', body: f }).then(function(r){ return r.blob(); }).then(function(b){ var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'backtest.csv'; a.click(); });
+        }); }
+        if(btnNotes){ btnNotes.addEventListener('click', function(){ var f = new FormData(); f.append('bt_json', document.getElementById('backtest-json').textContent); fetch('/ui/export_notes', { method:'POST', body: f }).then(function(r){ return r.blob(); }).then(function(b){ var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'ai_notes.txt'; a.click(); }); }); }
+      })();
   </script>
   </body>
   </html>
+
+

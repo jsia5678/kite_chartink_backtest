@@ -219,8 +219,8 @@ def compute_entry_exit_for_row(
 
     # Defaults - regular trades: Exit at market close based on effective_days
     exit_trade_date = trading_days_ahead(entry_dt_local.date(), effective_days)
-        exit_ts = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(15, 30)))
-        exit_time_str = "15:30"
+    exit_ts = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(15, 30)))
+    exit_time_str = "15:30"
     exit_reason = "Time"
     
     exit_price: Optional[float] = None
@@ -271,7 +271,7 @@ def compute_entry_exit_for_row(
                 stop_price = entry_price * (1.0 - (sl_pct or 0.0) / 100.0) if sl_pct else None
     else:
         if (sl_pct is not None and sl_pct > 0) or (tp_pct is not None and tp_pct > 0):
-        target_price = entry_price * (1.0 + (tp_pct or 0.0) / 100.0) if tp_pct else None
+            target_price = entry_price * (1.0 + (tp_pct or 0.0) / 100.0) if tp_pct else None
             stop_price = entry_price * (1.0 - (sl_pct or 0.0) / 100.0) if sl_pct else None
         
     # For swing trades, SL/TP is checked at daily close only
@@ -316,7 +316,7 @@ def compute_entry_exit_for_row(
         
         exit_ts = daily_data.index[exit_pos]
         exit_price = float(daily_data.iloc[exit_pos]["close"])  # type: ignore
-            exit_ts_local = exit_ts.astimezone(tz)
+        exit_ts_local = exit_ts.astimezone(tz)
         # Exit time enforcement: disallow 00:00 and force <= 15:25
         if exit_ts_local.hour == 0 and exit_ts_local.minute == 0:
             # shift to market close

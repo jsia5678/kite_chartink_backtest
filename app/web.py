@@ -500,39 +500,23 @@ async def ui_ai_strategy(
         )
         # Re-compute using daily data only for swing trades
         try:
-            # Lightweight re-run using the same parsed rows by re-reading CSV through engine utils is acceptable here.
+            # Use optimized batch processing for faster execution
             import pytz as _pytz
+            from .engine import compute_entry_exit_batch
             rows = parse_chartink_csv(tmp_csv_path, tz=_pytz.timezone(tz))
             kite = KiteService.from_env()
-            out = []
-            for r in rows:
-                try:
-                    out.append(
-                        compute_entry_exit_for_row(
-                            kite=kite,
-                            row=r,
-                            num_days=days,
-                            exchange=exchange,
-                            tz=_pytz.timezone(tz),
-                            sl_pct=_to_opt_float(sl_pct),
-                            tp_pct=_to_opt_float(tp_pct),
-                            breakeven_profit_pct=_to_opt_float(breakeven_profit_pct),
-                            breakeven_at_sl=bool(breakeven_at_sl),
-                        )
-                    )
-                except Exception as ee:
-                    out.append({
-                        "Stock": r.stock,
-                        "Entry Date": r.entry_date.isoformat(),
-                        "Entry Time": r.entry_time.strftime("%H:%M"),
-                        "Entry Price": None,
-                        "Exit Date": None,
-                        "Exit Time": None,
-                        "Exit Price": None,
-                        "Return %": None,
-                        "Exit Reason": None,
-                        "Error": str(ee),
-                    })
+            
+            out = compute_entry_exit_batch(
+                kite=kite,
+                rows=rows,
+                num_days=days,
+                exchange=exchange,
+                tz=_pytz.timezone(tz),
+                sl_pct=_to_opt_float(sl_pct),
+                tp_pct=_to_opt_float(tp_pct),
+                breakeven_profit_pct=_to_opt_float(breakeven_profit_pct),
+                breakeven_at_sl=bool(breakeven_at_sl),
+            )
             import pandas as _pd
             df = _pd.DataFrame(out)
         except Exception:

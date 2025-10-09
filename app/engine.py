@@ -12,6 +12,95 @@ from .types import BacktestInputRow
 from .trade_audit import TradeAuditor
 
 
+def compute_entry_exit_batch(
+    kite: KiteService,
+    rows: List[BacktestInputRow],
+    num_days: int,
+    exchange: str,
+    tz: pytz.BaseTzInfo,
+    sl_pct: Optional[float] = None,
+    tp_pct: Optional[float] = None,
+    breakeven_profit_pct: Optional[float] = None,
+    breakeven_at_sl: bool = False,
+) -> List[dict]:
+    """Optimized batch processing for multiple trades"""
+    results = []
+    daily_data_cache = {}
+    
+    # Group trades by stock to minimize API calls
+    stock_groups = {}
+    for i, row in enumerate(rows):
+        if row.stock not in stock_groups:
+            stock_groups[row.stock] = []
+        stock_groups[row.stock].append((i, row))
+    
+    # Process each stock group
+    for stock, trade_list in stock_groups.items():
+        # Fetch data once per stock
+        min_date = min(trade[1].entry_date for trade in trade_list) - dt.timedelta(days=5)
+        max_date = max(trade[1].entry_date for trade in trade_list) + dt.timedelta(days=num_days + 5)
+        
+        token = kite.resolve_instrument_token(symbol=stock, exchange=exchange)
+        daily_data = kite.fetch_ohlc(token=token, interval="day", 
+                                   start=tz.localize(dt.datetime.combine(min_date, dt.time(9, 0))),
+                                   end=tz.localize(dt.datetime.combine(max_date, dt.time(15, 30))),
+                                   tz=tz)
+        
+        if daily_data.empty:
+            # Handle error for all trades of this stock
+            for i, row in trade_list:
+                results.append({
+                    "Stock": row.stock,
+                    "Entry Date": row.entry_date.isoformat(),
+                    "Entry Time": row.entry_time.strftime("%H:%M"),
+                    "Entry Price": 0.0,
+                    "Exit Date": row.entry_date.isoformat(),
+                    "Exit Time": "15:30",
+                    "Exit Price": 0.0,
+                    "Exit Reason": "Error",
+                    "Return %": 0.0,
+                    "Holding Days": 0
+                })
+            continue
+        
+        # Cache the data
+        cache_key = f"{stock}_{exchange}"
+        daily_data_cache[cache_key] = daily_data
+        
+        # Process all trades for this stock
+        for i, row in trade_list:
+            try:
+                result = compute_entry_exit_for_row(
+                    kite=kite,
+                    row=row,
+                    num_days=num_days,
+                    exchange=exchange,
+                    tz=tz,
+                    sl_pct=sl_pct,
+                    tp_pct=tp_pct,
+                    breakeven_profit_pct=breakeven_profit_pct,
+                    breakeven_at_sl=breakeven_at_sl,
+                    daily_data_cache=daily_data_cache
+                )
+                results.append(result)
+            except Exception as e:
+                # Handle individual trade errors
+                results.append({
+                    "Stock": row.stock,
+                    "Entry Date": row.entry_date.isoformat(),
+                    "Entry Time": row.entry_time.strftime("%H:%M"),
+                    "Entry Price": 0.0,
+                    "Exit Date": row.entry_date.isoformat(),
+                    "Exit Time": "15:30",
+                    "Exit Price": 0.0,
+                    "Exit Reason": "Error",
+                    "Return %": 0.0,
+                    "Holding Days": 0
+                })
+    
+    return results
+
+
 
 def compute_entry_exit_for_row(
     kite: KiteService,
@@ -23,6 +112,7 @@ def compute_entry_exit_for_row(
     tp_pct: Optional[float] = None,
     breakeven_profit_pct: Optional[float] = None,
     breakeven_at_sl: bool = False,
+    daily_data_cache: Optional[Dict[str, pd.DataFrame]] = None,
 ) -> dict:
     # Build localized entry timestamp
     entry_dt_local = tz.localize(dt.datetime.combine(row.entry_date, row.entry_time))
@@ -31,16 +121,27 @@ def compute_entry_exit_for_row(
     # Get instrument token
     token = kite.resolve_instrument_token(symbol=row.stock, exchange=exchange)
 
-    # Get daily data for entry price
-    start = entry_dt_local - dt.timedelta(days=10)
-    end = entry_dt_local + dt.timedelta(days=1)
-    daily_data = kite.fetch_ohlc(token=token, interval="day", start=start, end=end, tz=tz)
-    if daily_data.empty:
-        raise ValueError(f"No daily data for {row.stock} around {entry_dt_local}")
+    # Use cached data if available, otherwise fetch minimal data
+    cache_key = f"{row.stock}_{exchange}"
+    if daily_data_cache and cache_key in daily_data_cache:
+        daily_data = daily_data_cache[cache_key]
+    else:
+        # Fetch only necessary data range
+        start = entry_dt_local - dt.timedelta(days=5)  # Reduced from 10 days
+        end = entry_dt_local + dt.timedelta(days=num_days + 5)  # Only fetch what we need
+        daily_data = kite.fetch_ohlc(token=token, interval="day", start=start, end=end, tz=tz)
+        if daily_data.empty:
+            raise ValueError(f"No daily data for {row.stock} around {entry_dt_local}")
+        
+        # Cache the data for future use
+        if daily_data_cache is not None:
+            daily_data_cache[cache_key] = daily_data
 
-    # Use the daily close price for entry
+    # Optimize date processing - use vectorized operations
     entry_date = entry_dt_local.date()
     daily_dates = pd.Index([ts.astimezone(tz).date() for ts in daily_data.index])
+    
+    # Find entry position more efficiently
     entry_pos = None
     for i, d in enumerate(daily_dates):
         if d <= entry_date:
@@ -66,24 +167,29 @@ def compute_entry_exit_for_row(
         target_price = entry_price * (1.0 + (tp_pct or 0.0) / 100.0) if tp_pct else None
         stop_price = entry_price * (1.0 - (sl_pct or 0.0) / 100.0) if sl_pct else None
         
-        # Check daily data for SL/TP hits from entry date onwards
-        for i in range(entry_pos + 1, len(daily_data)):
-            daily_close = float(daily_data.iloc[i]["close"])  # type: ignore
-            daily_ts = daily_data.index[i]
+        # Optimize SL/TP checking with vectorized operations
+        if entry_pos + 1 < len(daily_data):
+            # Get all closes from entry date onwards
+            future_data = daily_data.iloc[entry_pos + 1:]
+            closes = future_data["close"].astype(float)
             
-            # Check TP first
-            if target_price is not None and daily_close >= target_price:
-                exit_reason = "TP"
-                exit_price = daily_close
-                exit_ts = daily_ts
-                break
+            # Vectorized TP check
+            if target_price is not None:
+                tp_hits = closes >= target_price
+                if tp_hits.any():
+                    first_tp_idx = tp_hits.idxmax()
+                    exit_reason = "TP"
+                    exit_price = float(closes[first_tp_idx])
+                    exit_ts = first_tp_idx
             
-            # Check SL
-            if stop_price is not None and daily_close <= stop_price:
-                exit_reason = "SL"
-                exit_price = daily_close
-                exit_ts = daily_ts
-                break
+            # Vectorized SL check (only if TP didn't trigger)
+            if exit_price is None and stop_price is not None:
+                sl_hits = closes <= stop_price
+                if sl_hits.any():
+                    first_sl_idx = sl_hits.idxmax()
+                    exit_reason = "SL"
+                    exit_price = float(closes[first_sl_idx])
+                    exit_ts = first_sl_idx
 
     # If neither SL nor TP triggered, exit at scheduled date using daily data
     if exit_price is None:
@@ -144,37 +250,18 @@ def run_backtest_from_csv(
     if allowed_entry_times:
         allowed_set = {t.strip() for t in allowed_entry_times if t}
         rows = [r for r in rows if r.entry_time.strftime("%H:%M") in allowed_set]
-    results = []
-    for r in rows:
-        try:
-            results.append(
-                compute_entry_exit_for_row(
-                    kite=kite,
-                    row=r,
-                    num_days=num_days,
-                    exchange=exchange,
-                    tz=tz,
-                    sl_pct=sl_pct,
-                    tp_pct=tp_pct,
-                    breakeven_profit_pct=breakeven_profit_pct,
-                    breakeven_at_sl=breakeven_at_sl,
-                )
-            )
-        except Exception as e:
-            results.append(
-                {
-                    "Stock": r.stock,
-                    "Entry Date": r.entry_date.isoformat(),
-                    "Entry Time": r.entry_time.strftime("%H:%M"),
-                    "Entry Price": None,
-                    "Exit Date": None,
-                    "Exit Time": None,
-                    "Exit Price": None,
-                    "Return %": None,
-                    "Exit Reason": None,
-                    "Error": str(e),
-                }
-            )
+    # Use optimized batch processing
+    results = compute_entry_exit_batch(
+        kite=kite,
+        rows=rows,
+        num_days=num_days,
+        exchange=exchange,
+        tz=tz,
+        sl_pct=sl_pct,
+        tp_pct=tp_pct,
+        breakeven_profit_pct=breakeven_profit_pct,
+        breakeven_at_sl=breakeven_at_sl,
+    )
 
     df = pd.DataFrame(results)
 

@@ -79,7 +79,26 @@ def parse_chartink_csv(csv_path: str, tz: pytz.BaseTzInfo) -> List[BacktestInput
                 t = dt_parsed.time()  # type: ignore
 
         rows.append(BacktestInputRow(stock=stock, entry_date=date_val, entry_time=t))
-    return rows
+
+    # Keep only the earliest occurrence per symbol (by entry_date + entry_time)
+    earliest_by_stock: dict[str, BacktestInputRow] = {}
+    for r in rows:
+        key = r.stock.strip().upper()
+        current_dt = dt.datetime.combine(r.entry_date, r.entry_time)
+        prev = earliest_by_stock.get(key)
+        if prev is None:
+            earliest_by_stock[key] = r
+        else:
+            prev_dt = dt.datetime.combine(prev.entry_date, prev.entry_time)
+            if current_dt < prev_dt:
+                earliest_by_stock[key] = r
+
+    # Return in chronological order for deterministic processing
+    rows_dedup = sorted(
+        earliest_by_stock.values(),
+        key=lambda r: dt.datetime.combine(r.entry_date, r.entry_time),
+    )
+    return rows_dedup
 
 
 def nearest_prior_timestamp(index: pd.DatetimeIndex, target: dt.datetime):

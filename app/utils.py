@@ -16,6 +16,8 @@ def parse_chartink_csv(csv_path: str, tz: pytz.BaseTzInfo) -> List[BacktestInput
         "stock": None,       # Stock/Symbol/Tradingsymbol
         "entry_date": None,  # Entry Date/Date (can include time)
         "entry_time": None,  # Entry Time/Time (optional)
+        "cap": None,         # Small/Mid/Large
+        "sector": None,      # Sector/Industry
     }
     for c in df.columns:
         lc = c.strip().lower().replace(" ", "_")
@@ -25,6 +27,10 @@ def parse_chartink_csv(csv_path: str, tz: pytz.BaseTzInfo) -> List[BacktestInput
             col_map["entry_date"] = c
         elif lc in ("entry_time", "time"):
             col_map["entry_time"] = c
+        elif lc in ("cap", "cap_bucket", "market_cap", "cap_category"):
+            col_map["cap"] = c
+        elif lc in ("sector", "industry", "segment"):
+            col_map["sector"] = c
 
     # Must have stock and some form of date
     if col_map["stock"] is None or col_map["entry_date"] is None:
@@ -78,7 +84,14 @@ def parse_chartink_csv(csv_path: str, tz: pytz.BaseTzInfo) -> List[BacktestInput
                 date_val = dt_parsed.date()  # type: ignore
                 t = dt_parsed.time()  # type: ignore
 
-        rows.append(BacktestInputRow(stock=stock, entry_date=date_val, entry_time=t))
+        cap_bucket = None
+        sector = None
+        if col_map["cap"] is not None:
+            cap_bucket = str(rec[col_map["cap"]]).strip() or None
+        if col_map["sector"] is not None:
+            sector = str(rec[col_map["sector"]]).strip() or None
+
+        rows.append(BacktestInputRow(stock=stock, entry_date=date_val, entry_time=t, cap_bucket=cap_bucket, sector=sector))
 
     # Keep only the earliest occurrence per symbol (by entry_date + entry_time)
     earliest_by_stock: dict[str, BacktestInputRow] = {}

@@ -154,8 +154,30 @@ def compute_entry_exit_for_row(
     
     entry_price = float(daily_data.iloc[entry_pos]["close"])  # type: ignore
 
-    # Defaults - regular trades: Exit at market close
-    exit_trade_date = trading_days_ahead(entry_dt_local.date(), num_days)
+    # Compute cap-based max holding days
+    cap_to_max_days = {
+        "SMALL": 5,
+        "MID": 7,
+        "LARGE": 10,
+    }
+    max_days_by_cap = None
+    if getattr(row, "cap_bucket", None):
+        cap_key = (row.cap_bucket or "").strip().upper()
+        # normalize common variants
+        if cap_key.startswith("SMALL"):
+            cap_key = "SMALL"
+        elif cap_key.startswith("MID"):
+            cap_key = "MID"
+        elif cap_key.startswith("LARGE"):
+            cap_key = "LARGE"
+        max_days_by_cap = cap_to_max_days.get(cap_key)
+
+    effective_days = num_days
+    if max_days_by_cap is not None:
+        effective_days = min(num_days, max_days_by_cap)
+
+    # Defaults - regular trades: Exit at market close based on effective_days
+    exit_trade_date = trading_days_ahead(entry_dt_local.date(), effective_days)
     exit_ts = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(15, 30)))
     exit_time_str = "15:30"
     exit_reason = "Time"
@@ -208,7 +230,15 @@ def compute_entry_exit_for_row(
         exit_ts = daily_data.index[exit_pos]
         exit_price = float(daily_data.iloc[exit_pos]["close"])  # type: ignore
         exit_ts_local = exit_ts.astimezone(tz)
-        exit_time_str = "15:30" if (exit_ts_local.hour == 0 and exit_ts_local.minute == 0) else exit_ts_local.strftime("%H:%M")
+        # Exit time enforcement: disallow 00:00 and force <= 15:25
+        if exit_ts_local.hour == 0 and exit_ts_local.minute == 0:
+            # shift to market close
+            exit_ts_local = exit_ts_local.replace(hour=15, minute=25, second=0, microsecond=0)
+            exit_reason = "Rule-triggered exit"
+        if (exit_ts_local.hour, exit_ts_local.minute) > (15, 25):
+            exit_ts_local = exit_ts_local.replace(hour=15, minute=25, second=0, microsecond=0)
+            exit_reason = "Rule-triggered exit"
+        exit_time_str = exit_ts_local.strftime("%H:%M")
     else:
         exit_time_str = exit_ts.astimezone(tz).strftime("%H:%M")
 

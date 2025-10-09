@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+  <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Kite Chartink Backtest | Professional Trading Analysis</title>
   <link rel="stylesheet" href="/static/styles.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-</head>
-<body>
+  </head>
+  <body>
   <!-- Header -->
   <header class="header">
     <div class="header-content">
-      <a href="/" class="logo">
+      <a href="/dashboard" class="logo">
         <div class="logo-icon">📈</div>
         <span>Kite Chartink Backtest</span>
       </a>
@@ -20,12 +20,18 @@
         <button class="btn btn-secondary" onclick="document.getElementById('how-it-works').scrollIntoView({behavior:'smooth'})">
           How it Works
         </button>
+        <button class="btn btn-secondary" onclick="window.location.href='/setup'">
+          ⚙️ API Settings
+        </button>
+        <button class="btn btn-secondary" onclick="window.location.href='/logout'">
+          🚪 Logout
+        </button>
       </nav>
-    </div>
-  </header>
-
+      </div>
+    </header>
+    
   <!-- Main Content -->
-  <main class="container">
+    <main class="container">
     <!-- Hero Section -->
     <section class="fade-in" style="text-align: center; margin: 4rem 0;">
       <h1 style="font-size: 3rem; font-weight: 800; margin-bottom: 1rem; background: linear-gradient(135deg, #6366f1 0%, #22d3ee 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
@@ -34,8 +40,8 @@
       <p style="font-size: 1.25rem; color: var(--text-secondary); max-width: 600px; margin: 0 auto 2rem;">
         Upload your trading strategy CSV and get instant, comprehensive backtesting results with advanced analytics
       </p>
-    </section>
-
+      </section>
+      
     <!-- Upload Section -->
     <section class="grid" style="max-width: 1200px; margin: 0 auto; grid-template-columns: 1fr 1fr; gap: 2rem;">
       <!-- Manual Upload -->
@@ -61,14 +67,14 @@
             </div>
             <input type="file" id="file" name="file" accept=".csv" style="display:none;" required>
           </div>
-
+          
           <!-- Backtest Parameters -->
           <div class="grid grid-2">
             <div class="form-group">
               <label for="days">Holding Days</label>
               <input type="number" id="days" name="days" value="5" min="1" max="30" required>
             </div>
-            <div class="form-group">
+          <div class="form-group">
               <label for="exchange">Exchange</label>
               <select id="exchange" name="exchange">
                 <option value="NSE">NSE</option>
@@ -76,25 +82,25 @@
               </select>
             </div>
           </div>
-
+          
           <!-- Risk Management -->
           <div class="grid grid-3">
             <div class="form-group">
               <label for="sl_pct">Stop Loss %</label>
               <input type="number" id="sl_pct" name="sl_pct" step="0.01" placeholder="Optional">
-            </div>
+          </div>
             <div class="form-group">
               <label for="tp_pct">Take Profit %</label>
               <input type="number" id="tp_pct" name="tp_pct" step="0.01" placeholder="Optional">
-            </div>
+        </div>
             <div class="form-group">
               <label for="breakeven_profit_pct">Breakeven %</label>
               <input type="number" id="breakeven_profit_pct" name="breakeven_profit_pct" step="0.01" placeholder="Optional">
-            </div>
           </div>
-
+          </div>
+          
           <!-- Entry Time Filters -->
-          <div class="form-group">
+            <div class="form-group">
             <label>Entry Time Filters (Optional)</label>
             <div class="grid grid-3">
               <input type="text" name="entry_time" placeholder="e.g., 09:15">
@@ -102,9 +108,9 @@
               <input type="text" name="entry_time3" placeholder="e.g., 15:15">
             </div>
           </div>
-
+          
           <!-- Market Cap Filters -->
-          <div class="form-group">
+            <div class="form-group">
             <label>Market Cap Filters</label>
             <div class="flex gap-2">
               <div class="checkbox-group">
@@ -121,7 +127,7 @@
               </div>
             </div>
           </div>
-
+          
           <!-- Advanced Options -->
           <details style="margin: 1rem 0; cursor: pointer;">
             <summary style="color: var(--primary); font-weight: 600;">Advanced Options</summary>
@@ -129,8 +135,8 @@
               <div class="checkbox-group">
                 <input type="checkbox" id="breakeven_at_sl" name="breakeven_at_sl" value="1">
                 <label for="breakeven_at_sl">Move SL to breakeven at profit</label>
-              </div>
-            </div>
+          </div>
+        </div>
           </details>
 
           <!-- Submit Button -->
@@ -139,8 +145,8 @@
             <span id="btn-loading" class="loading" style="display: none;"></span>
           </button>
         </form>
-      </div>
-
+          </div>
+          
       <!-- AI Strategy -->
       <div class="card fade-in" style="animation-delay: 0.1s;">
         <h2 class="card-title">
@@ -169,14 +175,14 @@
               <input type="date" id="to_date" name="to_date">
             </div>
           </div>
-
+          
           <!-- Backtest Parameters -->
           <div class="grid grid-2">
             <div class="form-group">
               <label for="ai_days">Holding Days</label>
               <input type="number" id="ai_days" name="days" value="5" min="1" max="30" required>
             </div>
-            <div class="form-group">
+          <div class="form-group">
               <label for="ai_exchange">Exchange</label>
               <select id="ai_exchange" name="exchange">
                 <option value="NSE">NSE</option>
@@ -184,7 +190,7 @@
               </select>
             </div>
           </div>
-
+          
           <!-- Risk Parameters -->
           <div class="grid grid-3">
             <div class="form-group">
@@ -194,20 +200,20 @@
             <div class="form-group">
               <label for="ai_tp">Take Profit %</label>
               <input type="number" id="ai_tp" name="tp_pct" step="0.01" placeholder="Optional">
-            </div>
+          </div>
             <div class="form-group">
               <label for="ai_be">Breakeven %</label>
               <input type="number" id="ai_be" name="breakeven_profit_pct" step="0.01" placeholder="Optional">
-            </div>
+        </div>
           </div>
-
+          
           <div class="alert alert-info" style="font-size: 0.85rem;">
             <span>💡</span>
             <div>
               <strong>Tip:</strong> Be specific about entry conditions, indicators, and time frames. The AI will analyze historical data and generate a CSV of matching trades.
-            </div>
           </div>
-
+          </div>
+          
           <!-- Submit Button -->
           <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;" id="ai-submit-btn">
             <span id="ai-btn-text">✨ Generate & Backtest</span>
@@ -334,7 +340,7 @@
       const btn = document.getElementById('submit-btn');
       document.getElementById('btn-text').style.display = 'none';
       document.getElementById('btn-loading').style.display = 'inline-block';
-      btn.disabled = true;
+        btn.disabled = true;
     });
 
     document.getElementById('ai-form').addEventListener('submit', function() {
@@ -365,6 +371,6 @@
       el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
       observer.observe(el);
     });
-  </script>
-</body>
+    </script>
+  </body>
 </html>

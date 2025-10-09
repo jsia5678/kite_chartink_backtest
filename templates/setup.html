@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Setup - Kite Chartink Backtest</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-content">
+      <a href="/" class="logo">
+        <div class="logo-icon">📈</div>
+        <span>Kite Chartink Backtest</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="container">
+    <!-- Hero Section -->
+    <section class="fade-in" style="text-align: center; margin: 3rem auto; max-width: 800px;">
+      <div style="font-size: 4rem; margin-bottom: 1rem;">🔐</div>
+      <h1 style="font-size: 2.5rem; font-weight: 800; margin-bottom: 1rem;">
+        Welcome to Kite Chartink Backtest
+      </h1>
+      <p style="font-size: 1.1rem; color: var(--text-secondary); margin-bottom: 2rem;">
+        To get started, please configure your API credentials. These will be stored securely in your session.
+      </p>
+    </section>
+
+    <!-- Setup Form -->
+    <section style="max-width: 600px; margin: 0 auto;">
+      <div class="card">
+        <h2 class="card-title">
+          <span class="card-title-icon">⚙️</span>
+          API Configuration
+        </h2>
+
+        {% if error %}
+        <div class="alert alert-danger">
+          <span>⚠️</span>
+          <div>{{ error }}</div>
+        </div>
+        {% endif %}
+
+        <form id="setup-form" method="POST" action="/setup">
+          <!-- Kite API Key -->
+          <div class="form-group">
+            <label for="api_key">
+              <strong>Kite API Key</strong>
+              <span style="color: var(--danger);">*</span>
+            </label>
+            <input 
+              type="text" 
+              id="api_key" 
+              name="api_key" 
+              placeholder="Enter your Kite API Key"
+              value="{{ saved_api_key or '' }}"
+              required
+            >
+            <small style="color: var(--text-muted); display: block; margin-top: 0.5rem;">
+              Get your API key from <a href="https://kite.zerodha.com" target="_blank" style="color: var(--primary);">Kite Connect</a>
+            </small>
+          </div>
+
+          <!-- Kite API Secret -->
+          <div class="form-group">
+            <label for="api_secret">
+              <strong>Kite API Secret</strong>
+              <span style="color: var(--danger);">*</span>
+            </label>
+            <input 
+              type="password" 
+              id="api_secret" 
+              name="api_secret" 
+              placeholder="Enter your Kite API Secret"
+              value="{{ saved_api_secret or '' }}"
+              required
+            >
+            <small style="color: var(--text-muted); display: block; margin-top: 0.5rem;">
+              Keep this secret safe and never share it
+            </small>
+          </div>
+
+          <!-- Kite Access Token -->
+          <div class="form-group">
+            <label for="access_token">
+              <strong>Kite Access Token</strong>
+              <span style="color: var(--danger);">*</span>
+            </label>
+            <input 
+              type="text" 
+              id="access_token" 
+              name="access_token" 
+              placeholder="Enter your Kite Access Token"
+              value="{{ saved_access_token or '' }}"
+              required
+            >
+            <small style="color: var(--text-muted); display: block; margin-top: 0.5rem;">
+              Generate a new access token daily from Kite Connect
+            </small>
+          </div>
+
+          <hr style="border: none; border-top: 1px solid var(--border-color); margin: 2rem 0;">
+
+          <!-- Optional: Perplexity API Key -->
+          <div class="form-group">
+            <label for="pplx_api_key">
+              <strong>Perplexity API Key</strong>
+              <span style="color: var(--text-muted); font-weight: 400;">(Optional)</span>
+            </label>
+            <input 
+              type="text" 
+              id="pplx_api_key" 
+              name="pplx_api_key" 
+              placeholder="For AI features (optional)"
+              value="{{ saved_pplx_key or '' }}"
+            >
+            <small style="color: var(--text-muted); display: block; margin-top: 0.5rem;">
+              Required for AI Strategy Generator and AI Assistant features. Get it from <a href="https://www.perplexity.ai" target="_blank" style="color: var(--primary);">Perplexity</a>
+            </small>
+          </div>
+
+          <!-- Advanced Settings -->
+          <details style="margin: 1.5rem 0; cursor: pointer;">
+            <summary style="color: var(--primary); font-weight: 600; padding: 0.5rem 0;">
+              ⚙️ Advanced Settings
+            </summary>
+            <div style="margin-top: 1rem; padding: 1.5rem; background: var(--bg-secondary); border-radius: var(--radius-md);">
+              <div class="form-group">
+                <label for="exchange">Default Exchange</label>
+                <select id="exchange" name="exchange">
+                  <option value="NSE" {{ 'selected' if saved_exchange == 'NSE' else '' }}>NSE (National Stock Exchange)</option>
+                  <option value="BSE" {{ 'selected' if saved_exchange == 'BSE' else '' }}>BSE (Bombay Stock Exchange)</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="timezone">Timezone</label>
+                <select id="timezone" name="timezone">
+                  <option value="Asia/Kolkata" {{ 'selected' if saved_timezone == 'Asia/Kolkata' else '' }}>Asia/Kolkata (IST)</option>
+                  <option value="UTC">UTC</option>
+                </select>
+              </div>
+            </div>
+          </details>
+
+          <!-- Info Box -->
+          <div class="alert alert-info" style="margin-bottom: 1.5rem;">
+            <span>💡</span>
+            <div>
+              <strong>Why do we need this?</strong>
+              <p style="margin-top: 0.5rem; font-size: 0.9rem; line-height: 1.6;">
+                We use Kite Connect API to fetch real historical price data for accurate backtesting. 
+                Your credentials are stored only in your session cookies and are never saved permanently.
+              </p>
+            </div>
+          </div>
+
+          <!-- Submit Button -->
+          <button type="submit" class="btn btn-primary" style="width: 100%; padding: 1rem; font-size: 1.1rem;" id="submit-btn">
+            <span id="btn-text">🚀 Continue to Backtesting</span>
+            <span id="btn-loading" class="loading" style="display: none;"></span>
+          </button>
+        </form>
+
+        <!-- Help Section -->
+        <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--border-color);">
+          <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-secondary);">
+            Need help getting your API credentials?
+          </h3>
+          
+          <div style="display: grid; gap: 1rem;">
+            <details style="cursor: pointer;">
+              <summary style="color: var(--primary); font-weight: 500; padding: 0.5rem 0;">
+                📖 How to get Kite API Key & Secret?
+              </summary>
+              <div style="margin-top: 0.5rem; padding: 1rem; background: var(--bg-secondary); border-radius: var(--radius-md); font-size: 0.9rem; line-height: 1.8;">
+                <ol style="padding-left: 1.5rem;">
+                  <li>Visit <a href="https://kite.zerodha.com" target="_blank" style="color: var(--primary);">kite.zerodha.com</a></li>
+                  <li>Login with your Zerodha credentials</li>
+                  <li>Go to "Console" → "My Apps"</li>
+                  <li>Create a new app or select existing one</li>
+                  <li>Copy the API Key and API Secret</li>
+                </ol>
+              </div>
+            </details>
+
+            <details style="cursor: pointer;">
+              <summary style="color: var(--primary); font-weight: 500; padding: 0.5rem 0;">
+                🔑 How to generate Access Token?
+              </summary>
+              <div style="margin-top: 0.5rem; padding: 1rem; background: var(--bg-secondary); border-radius: var(--radius-md); font-size: 0.9rem; line-height: 1.8;">
+                <ol style="padding-left: 1.5rem;">
+                  <li>After creating your app, note the API Key</li>
+                  <li>Visit the login URL (provided in your app console)</li>
+                  <li>Login and authorize the app</li>
+                  <li>Copy the request_token from the redirect URL</li>
+                  <li>Use the request_token to generate access_token</li>
+                  <li><strong>Note:</strong> Access tokens expire daily and need to be regenerated</li>
+                </ol>
+              </div>
+            </details>
+
+            <details style="cursor: pointer;">
+              <summary style="color: var(--primary); font-weight: 500; padding: 0.5rem 0;">
+                🤖 What about Perplexity API?
+              </summary>
+              <div style="margin-top: 0.5rem; padding: 1rem; background: var(--bg-secondary); border-radius: var(--radius-md); font-size: 0.9rem; line-height: 1.8;">
+                <p>The Perplexity API key is optional and only needed for:</p>
+                <ul style="padding-left: 1.5rem; margin-top: 0.5rem;">
+                  <li>AI Strategy Generator</li>
+                  <li>AI Insights on backtest results</li>
+                  <li>AI Chat Assistant</li>
+                </ul>
+                <p style="margin-top: 0.5rem;">
+                  You can still run backtests without it. Get your key from 
+                  <a href="https://www.perplexity.ai/settings/api" target="_blank" style="color: var(--primary);">Perplexity Settings</a>
+                </p>
+              </div>
+            </details>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Security Notice -->
+    <section style="max-width: 600px; margin: 2rem auto;">
+      <div class="alert alert-warning">
+        <span>🔒</span>
+        <div>
+          <strong>Security Notice:</strong>
+          <p style="margin-top: 0.5rem; font-size: 0.9rem; line-height: 1.6;">
+            Your API credentials are stored securely in encrypted session cookies. 
+            They are never logged or stored permanently on our servers. 
+            Always keep your API Secret safe and never share it with anyone.
+          </p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer style="text-align: center; padding: 3rem 0; margin-top: 4rem; border-top: 1px solid var(--border-color);">
+    <p style="color: var(--text-muted); font-size: 0.9rem;">
+      🔐 Your credentials are stored only in your browser session
+    </p>
+  </footer>
+
+  <script>
+    // Form submission loading state
+    document.getElementById('setup-form').addEventListener('submit', function() {
+      const btn = document.getElementById('submit-btn');
+      document.getElementById('btn-text').style.display = 'none';
+      document.getElementById('btn-loading').style.display = 'inline-block';
+      btn.disabled = true;
+    });
+
+    // Password visibility toggle
+    const apiSecretInput = document.getElementById('api_secret');
+    apiSecretInput.addEventListener('dblclick', function() {
+      this.type = this.type === 'password' ? 'text' : 'password';
+    });
+
+    // Fade-in animation
+    const observerOptions = {
+      threshold: 0.1,
+      rootMargin: '0px 0px -50px 0px'
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.style.opacity = '1';
+          entry.target.style.transform = 'translateY(0)';
+        }
+      });
+    }, observerOptions);
+
+    document.querySelectorAll('.fade-in').forEach(el => {
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(20px)';
+      el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+      observer.observe(el);
+    });
+
+    // Show helpful hint if fields are empty
+    setTimeout(() => {
+      const apiKey = document.getElementById('api_key');
+      if (!apiKey.value) {
+        apiKey.placeholder = "e.g., abcd1234efgh5678ijkl";
+      }
+    }, 2000);
+  </script>
+</body>
+</html>
+

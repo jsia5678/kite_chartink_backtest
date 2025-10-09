@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+  <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Backtest Results | Kite Chartink Backtest</title>
@@ -8,44 +8,50 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-</head>
-<body>
+  </head>
+  <body>
   <!-- Header -->
   <header class="header">
     <div class="header-content">
-      <a href="/" class="logo">
+      <a href="/dashboard" class="logo">
         <div class="logo-icon">📈</div>
         <span>Backtest Results</span>
       </a>
       <nav class="nav-actions">
-        <button class="btn btn-secondary" onclick="window.location.href='/'">
+        <button class="btn btn-secondary" onclick="window.location.href='/dashboard'">
           🔙 New Backtest
         </button>
-      </nav>
-    </div>
-  </header>
+        <button class="btn btn-secondary" onclick="window.location.href='/setup'">
+          ⚙️ Settings
+        </button>
+        <button class="btn btn-secondary" onclick="window.location.href='/logout'">
+          🚪 Logout
+        </button>
+        </nav>
+      </div>
+    </header>
 
   <!-- Main Content -->
-  <main class="container">
+    <main class="container">
     
     <!-- Alert Messages -->
-    {% if error %}
+      {% if error %}
     <div class="alert alert-danger">
       <span style="font-size: 1.5rem;">⚠️</span>
       <div>
         <strong>Error:</strong> {{ error }}
       </div>
     </div>
-    {% endif %}
+      {% endif %}
 
-    {% if ai_prompt %}
+      {% if ai_prompt %}
     <div class="alert alert-info">
       <span style="font-size: 1.5rem;">🤖</span>
       <div>
         <strong>AI Strategy:</strong> {{ ai_prompt }}
       </div>
     </div>
-    {% endif %}
+      {% endif %}
 
     <!-- Key Metrics Dashboard -->
     {% if stats %}
@@ -72,35 +78,35 @@
           <div class="metric-value {% if stats['avg_ret_pct'] > 0 %}positive{% else %}negative{% endif %}">
             {{ '%.2f'|format(stats['avg_ret_pct']) }}%
           </div>
-        </div>
+              </div>
         
         <div class="metric-card">
           <div class="metric-label">Max Gain</div>
           <div class="metric-value positive">
             {{ '%.2f'|format(stats['max_dd_pct']) }}%
-          </div>
-        </div>
+              </div>
+              </div>
         
         <div class="metric-card">
           <div class="metric-label">Compounded Return</div>
           <div class="metric-value {% if stats['compound_ret_pct'] > 0 %}positive{% else %}negative{% endif %}">
             {{ '%.2f'|format(stats['compound_ret_pct']) }}%
           </div>
-        </div>
-        
+          </div>
+
         <div class="metric-card">
           <div class="metric-label">Max Drawdown</div>
           <div class="metric-value negative">
             {{ '%.2f'|format(stats['max_dd_pct']) }}%
           </div>
-        </div>
-        
+          </div>
+
         <div class="metric-card">
           <div class="metric-label">Risk/Reward</div>
           <div class="metric-value">
             {{ '%.2f'|format(stats['r_r']) }}
           </div>
-        </div>
+            </div>
         
         <div class="metric-card">
           <div class="metric-label">Expectancy</div>
@@ -114,8 +120,8 @@
           <div class="metric-value">
             {{ '%.2f'|format(stats['sharpe_ratio']) }}
           </div>
-        </div>
-        
+          </div>
+
         <div class="metric-card">
           <div class="metric-label">Calmar Ratio</div>
           <div class="metric-value">
@@ -123,25 +129,25 @@
           </div>
         </div>
       </div>
-    </section>
-    {% endif %}
+      </section>
+      {% endif %}
 
     <!-- Trade Audit Summary -->
-    {% if audit_summary %}
+      {% if audit_summary %}
     <section class="fade-in" style="margin-top: 2rem;">
       <h2 style="font-size: 1.75rem; margin-bottom: 1.5rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
         <span>🔍</span> Trade Audit Summary
       </h2>
       
-      <div class="card">
+        <div class="card">
         <div class="metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
           <div>
             <div class="metric-label">Strategy Type</div>
             <div style="margin-top: 0.5rem;">
-              {% for strategy, count in audit_summary.strategy_distribution.items() %}
+                {% for strategy, count in audit_summary.strategy_distribution.items() %}
                 <span class="badge badge-primary">{{ strategy }}: {{ count }}</span>
-              {% endfor %}
-            </div>
+                {% endfor %}
+              </div>
           </div>
           
           <div>
@@ -166,24 +172,24 @@
           </div>
         </div>
         
-        {% if audit_summary.common_violations %}
+          {% if audit_summary.common_violations %}
         <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
           <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--danger);">
             ⚠️ Common Violations
           </h4>
           <ul style="list-style: none; padding: 0;">
-            {% for violation, count in audit_summary.common_violations[:3] %}
+              {% for violation, count in audit_summary.common_violations[:3] %}
             <li style="padding: 0.5rem 0; color: var(--text-secondary); font-size: 0.9rem;">
               <span class="badge badge-danger" style="margin-right: 0.5rem;">{{ count }}x</span>
               {{ violation }}
             </li>
-            {% endfor %}
-          </ul>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endif %}
         </div>
-        {% endif %}
-      </div>
-    </section>
-    {% endif %}
+      </section>
+      {% endif %}
 
     <!-- Equity Curve Chart -->
     {% if equity %}
@@ -261,7 +267,7 @@
                 <input type="number" id="tp_pct" name="tp_pct" step="0.01" value="{{ (defaults and defaults.tp_pct) or '' }}">
               </div>
             </div>
-            
+
             <div class="form-group">
               <label>Market Cap</label>
               <div class="flex gap-2">
@@ -334,8 +340,8 @@
               <option value="ret_desc">Return (High → Low)</option>
               <option value="ret_asc">Return (Low → High)</option>
             </select>
-          </div>
-        </div>
+      </div>
+      </div>
       </aside>
     </div>
 
@@ -368,8 +374,8 @@
           </tbody>
         </table>
       </div>
-    </section>
-    {% endif %}
+          </section>
+            {% endif %}
 
     <!-- Warnings -->
     <div id="warnings-card" class="card" style="margin-top: 2rem; display: none;">
@@ -377,9 +383,9 @@
       <ul id="warnings-list" style="list-style: none; padding: 0;">
         <!-- Populated by JavaScript -->
       </ul>
-    </div>
+      </div>
 
-  </main>
+    </main>
 
   <script>
     // Trade data from backend
@@ -392,8 +398,8 @@
     const equityData = {{ equity|tojson|safe }};
     const ctx = document.getElementById('equity-chart').getContext('2d');
     
-    new Chart(ctx, {
-      type: 'line',
+        new Chart(ctx, {
+          type: 'line',
       data: {
         labels: equityData.map(e => e.trade_num),
         datasets: [{
@@ -464,9 +470,9 @@
           if (f === 'tp') return reason.includes('tp') || reason.includes('take');
           if (f === 'sl') return reason.includes('sl') || reason.includes('stop');
           if (f === 'time') return reason.includes('time');
-          return true;
-        });
-      }
+                return true;
+              });
+            }
       
       // Sort
       if (sortEl.value === 'ret_desc') {
@@ -492,9 +498,9 @@
           <td><span class="badge badge-info">${r['Strategy_Type'] || 'swing'}</span></td>
           <td><span class="badge ${r['Audit_Status'] === 'PASS' ? 'badge-success' : 'badge-warning'}">${r['Audit_Status'] || 'N/A'}</span></td>
         </tr>`;
-      }).join('');
-    }
-    
+            }).join('');
+          }
+
     renderTrades();
     document.getElementById('filter').addEventListener('change', renderTrades);
     document.getElementById('sort').addEventListener('change', renderTrades);
@@ -527,7 +533,7 @@
     }
     
     chatForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
+          e.preventDefault();
       const question = chatInput.value.trim();
       if (!question) return;
       
@@ -592,5 +598,5 @@
       observer.observe(el);
     });
   </script>
-</body>
-</html>
+  </body>
+  </html>

@@ -177,18 +177,27 @@ body::before {
   border-radius: var(--radius-lg);
   min-width: 200px;
   box-shadow: var(--shadow-xl);
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(-10px);
+  display: none;
+  transform: translateY(0);
   transition: all var(--transition-base);
   z-index: 1000;
   backdrop-filter: blur(20px);
 }
 
 .dropdown-menu.show {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
+  display: block;
+  animation: dropdownFadeIn 0.2s ease;
+}
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .dropdown-item {
@@ -749,6 +758,20 @@ tbody tr:hover {
   
   .header-content {
     padding: 0 var(--spacing-md);
+    flex-wrap: wrap;
+  }
+  
+  .logo span {
+    font-size: 1rem;
+  }
+  
+  .nav-actions {
+    gap: var(--spacing-sm);
+  }
+  
+  .nav-actions .btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
   }
   
   .metrics-grid {
@@ -761,6 +784,10 @@ tbody tr:hover {
   
   .metric-value {
     font-size: 1.5rem;
+  }
+  
+  .dropdown-menu {
+    min-width: 180px;
   }
 }
 

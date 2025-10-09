@@ -105,7 +105,7 @@ def main():
     print(audited_df[['Stock', 'Strategy_Type', 'Audit_Status', 'Violations']].to_string(index=False))
     
     print(f"\n🎯 Key Features Demonstrated:")
-    print("• Automatic strategy type detection (Intraday, Swing)")
+    print("• Automatic strategy type detection (Swing)")
     print("• Entry/exit timing validation")
     print("• Holding period validation")
     print("• Exit reason validation")

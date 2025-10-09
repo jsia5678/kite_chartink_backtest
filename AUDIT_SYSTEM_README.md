@@ -7,7 +7,6 @@ The Trade Audit System is a self-auditing tool that ensures trades follow define
 ## Features
 
 ### 🔍 Strategy Type Detection
-- **Intraday**: Same-day trades, no overnight carry
 - **Swing**: Multi-day holding, exit at target/SL only
 
 ### ✅ Validation Rules
@@ -18,7 +17,6 @@ The Trade Audit System is a self-auditing tool that ensures trades follow define
 
 #### Holding Period
 - Checks holding duration against maximum allowed days
-- Prevents overnight carry violations for intraday strategies
 
 #### Exit Reasons
 - Validates exit reasons match actual price movements
@@ -29,10 +27,6 @@ The Trade Audit System is a self-auditing tool that ensures trades follow define
 - Ensures accurate performance metrics
 
 ### 🔧 Automatic Corrections
-
-#### Intraday Strategy
-- Ensures same-day exit at market close (15:30)
-- Prevents overnight carry violations
 
 #### Swing Strategy
 - Allows multi-day holding within limits
@@ -78,24 +72,12 @@ if enable_audit:
 - **Common Violations**: Most frequent rule violations
 
 ### Trade-Level Results
-- **Strategy_Type**: Detected strategy (intraday/swing)
+- **Strategy_Type**: Detected strategy (swing)
 - **Audit_Status**: PASS/FAIL/ERROR
 - **Violations**: List of specific rule violations
 - **Corrected Trade**: Trade data after applying corrections
 
 ## Strategy Rules
-
-### Intraday Strategy
-```python
-StrategyRules(
-    max_holding_days=1,
-    allowed_entry_times=[09:15, 09:30, 10:00, 10:30, 11:00],
-    allowed_exit_times=[15:15, 15:30],
-    overnight_allowed=False,
-    exit_at_close_required=True
-)
-```
-
 
 ### Swing Strategy
 ```python

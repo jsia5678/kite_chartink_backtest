@@ -23,7 +23,6 @@ def compute_entry_exit_for_row(
     tp_pct: Optional[float] = None,
     breakeven_profit_pct: Optional[float] = None,
     breakeven_at_sl: bool = False,
-    intraday_interval: str = "15minute",
 ) -> dict:
     # Build localized entry timestamp
     entry_dt_local = tz.localize(dt.datetime.combine(row.entry_date, row.entry_time))
@@ -32,18 +31,27 @@ def compute_entry_exit_for_row(
     # Get instrument token
     token = kite.resolve_instrument_token(symbol=row.stock, exchange=exchange)
 
-    # Intraday candles around entry date to price at/just before entry
-    start = entry_dt_local - dt.timedelta(days=5)
+    # Get daily data for entry price
+    start = entry_dt_local - dt.timedelta(days=10)
     end = entry_dt_local + dt.timedelta(days=1)
-    candles_intraday = kite.fetch_ohlc(token=token, interval=intraday_interval, start=start, end=end, tz=tz)
-    if candles_intraday.empty:
-        raise ValueError(f"No {intraday_interval} data for {row.stock} around {entry_dt_local}")
+    daily_data = kite.fetch_ohlc(token=token, interval="day", start=start, end=end, tz=tz)
+    if daily_data.empty:
+        raise ValueError(f"No daily data for {row.stock} around {entry_dt_local}")
 
-    # Find nearest earlier candle at or before entry time
-    entry_ts = nearest_prior_timestamp(candles_intraday.index, entry_dt_local)
-    if entry_ts is None:
-        raise ValueError(f"No prior candle for {row.stock} at {entry_dt_local}")
-    entry_price = float(candles_intraday.loc[entry_ts, "close"]) if "close" in candles_intraday.columns else float(candles_intraday.loc[entry_ts, "ohlc"]["close"])  # type: ignore
+    # Use the daily close price for entry
+    entry_date = entry_dt_local.date()
+    daily_dates = pd.Index([ts.astimezone(tz).date() for ts in daily_data.index])
+    entry_pos = None
+    for i, d in enumerate(daily_dates):
+        if d <= entry_date:
+            entry_pos = i
+        else:
+            break
+    
+    if entry_pos is None:
+        raise ValueError(f"No daily data for {row.stock} on or before {entry_date}")
+    
+    entry_price = float(daily_data.iloc[entry_pos]["close"])  # type: ignore
 
     # Defaults - regular trades: Exit at market close
     exit_trade_date = trading_days_ahead(entry_dt_local.date(), num_days)
@@ -53,72 +61,48 @@ def compute_entry_exit_for_row(
     
     exit_price: Optional[float] = None
 
-    # If SL/TP provided, scan intraday candles from entry onward using intraday_interval CLOSES
-    if (sl_pct is not None and sl_pct > 0) or (tp_pct is not None and tp_pct > 0) or (breakeven_profit_pct is not None) or breakeven_at_sl:
+    # For swing trades, SL/TP is checked at daily close only
+    if (sl_pct is not None and sl_pct > 0) or (tp_pct is not None and tp_pct > 0):
         target_price = entry_price * (1.0 + (tp_pct or 0.0) / 100.0) if tp_pct else None
-        base_stop_price = entry_price * (1.0 - (sl_pct or 0.0) / 100.0) if sl_pct else None
-        current_stop = base_stop_price
-        breakeven_set = False
+        stop_price = entry_price * (1.0 - (sl_pct or 0.0) / 100.0) if sl_pct else None
+        
+        # Check daily data for SL/TP hits from entry date onwards
+        for i in range(entry_pos + 1, len(daily_data)):
+            daily_close = float(daily_data.iloc[i]["close"])  # type: ignore
+            daily_ts = daily_data.index[i]
+            
+            # Check TP first
+            if target_price is not None and daily_close >= target_price:
+                exit_reason = "TP"
+                exit_price = daily_close
+                exit_ts = daily_ts
+                break
+            
+            # Check SL
+            if stop_price is not None and daily_close <= stop_price:
+                exit_reason = "SL"
+                exit_price = daily_close
+                exit_ts = daily_ts
+                break
 
-        scan_start = entry_ts
-        scan_end = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(15, 30)))
-        intraday = kite.fetch_ohlc(token=token, interval=intraday_interval, start=scan_start, end=scan_end, tz=tz)
-        if not intraday.empty:
-            intraday = intraday[intraday.index > entry_ts]
-            for ts, row_c in intraday.iterrows():
-                close_v = float(row_c.get("close", row_c.get("ohlc", {}).get("close", 0.0)))  # type: ignore
-                # 1) TP check (at close)
-                if target_price is not None and close_v >= target_price:
-                    exit_reason = "TP"
-                    exit_price = close_v
-                    exit_ts = ts
-                    break
-
-                # 2) Breakeven logic: either fixed profit % or when profit >= SL%
-                activate_be = False
-                if breakeven_profit_pct is not None:
-                    if close_v >= entry_price * (1.0 + breakeven_profit_pct / 100.0):
-                        activate_be = True
-                if not activate_be and breakeven_at_sl and sl_pct is not None and sl_pct > 0:
-                    if close_v >= entry_price * (1.0 + sl_pct / 100.0):
-                        activate_be = True
-                if activate_be and not breakeven_set:
-                    current_stop = max(current_stop or -1e18, entry_price)
-                    breakeven_set = True
-
-                # 3) Baseline SL check (at close) using current_stop
-                if current_stop is not None and close_v <= current_stop:
-                    exit_reason = "SL"
-                    exit_price = close_v
-                    exit_ts = ts
-                    break
-
-    # If neither SL nor TP triggered, handle exit at market close
+    # If neither SL nor TP triggered, exit at scheduled date using daily data
     if exit_price is None:
-        day_start = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(9, 0)))
-        day_end = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(15, 30)))
-        intraday_exit = kite.fetch_ohlc(token=token, interval=intraday_interval, start=day_start, end=day_end, tz=tz)
-        if not intraday_exit.empty:
-            exit_ts = intraday_exit.index[-1]
-            exit_price = float(intraday_exit.iloc[-1]["close"])  # type: ignore
-            exit_time_str = exit_ts.astimezone(tz).strftime("%H:%M")
-        else:
-            # Fallback to daily close if no intraday data available
-            daily_start = tz.localize(dt.datetime.combine(entry_dt_local.date() - dt.timedelta(days=10), dt.time(9, 0)))
-            daily_end = tz.localize(dt.datetime.combine(exit_trade_date + dt.timedelta(days=5), dt.time(15, 30)))
-            daily = kite.fetch_ohlc(token=token, interval="day", start=daily_start, end=daily_end, tz=tz)
-            if daily.empty:
-                raise ValueError(f"No daily data for {row.stock}")
-            daily_dates = pd.Index([ts.astimezone(tz).date() for ts in daily.index])
-            candidate_positions = [i for i, d in enumerate(daily_dates) if d >= exit_trade_date]
-            if not candidate_positions:
-                exit_pos = len(daily) - 1
-            else:
-                exit_pos = candidate_positions[0]
-            exit_ts = daily.index[exit_pos]
-            exit_price = float(daily.iloc[exit_pos]["close"])  # type: ignore
-            exit_ts_local = exit_ts.astimezone(tz)
-            exit_time_str = "15:30" if (exit_ts_local.hour == 0 and exit_ts_local.minute == 0) else exit_ts_local.strftime("%H:%M")
+        # Find the exit date in our daily data
+        exit_dates = pd.Index([ts.astimezone(tz).date() for ts in daily_data.index])
+        exit_pos = None
+        for i, d in enumerate(exit_dates):
+            if d >= exit_trade_date:
+                exit_pos = i
+                break
+        
+        if exit_pos is None:
+            # If exit date not found, use the last available date
+            exit_pos = len(daily_data) - 1
+        
+        exit_ts = daily_data.index[exit_pos]
+        exit_price = float(daily_data.iloc[exit_pos]["close"])  # type: ignore
+        exit_ts_local = exit_ts.astimezone(tz)
+        exit_time_str = "15:30" if (exit_ts_local.hour == 0 and exit_ts_local.minute == 0) else exit_ts_local.strftime("%H:%M")
     else:
         exit_time_str = exit_ts.astimezone(tz).strftime("%H:%M")
 

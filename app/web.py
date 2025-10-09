@@ -368,32 +368,7 @@ async def ui_ai_strategy(
         if not pplx_key:
             raise RuntimeError("Missing PPLX_API_KEY in environment")
 
-        # Determine intraday interval from timeframe hint (default 15minute)
-        tf_map = {
-            "1m": "minute",
-            "1min": "minute",
-            "5m": "5minute",
-            "5min": "5minute",
-            "10m": "10minute",
-            "15m": "15minute",
-            "15min": "15minute",
-            "30m": "30minute",
-            "30min": "30minute",
-            "60m": "60minute",
-            "1h": "60minute",
-            "hour": "60minute",
-        }
-        intraday_interval = "15minute"
-        if timeframe:
-            key = timeframe.strip().lower()
-            intraday_interval = tf_map.get(key, intraday_interval)
-        else:
-            # Try to infer from prompt keywords
-            pl = (prompt or "").lower()
-            for k, v in tf_map.items():
-                if k in pl:
-                    intraday_interval = v
-                    break
+        # Note: Intraday intervals no longer supported - using daily data only for swing trades
 
         # Enhance system instructions with optional date range
         date_hint = ""
@@ -523,8 +498,7 @@ async def ui_ai_strategy(
             breakeven_at_sl=bool(breakeven_at_sl),
             enable_audit=True,
         )
-        # Re-compute with chosen intraday interval by applying row-wise if intraday_interval differs from default
-        # Note: run_backtest_from_csv uses compute_entry_exit_for_row; we need a version that passes intraday_interval.
+        # Re-compute using daily data only for swing trades
         try:
             # Lightweight re-run using the same parsed rows by re-reading CSV through engine utils is acceptable here.
             import pytz as _pytz
@@ -544,7 +518,6 @@ async def ui_ai_strategy(
                             tp_pct=_to_opt_float(tp_pct),
                             breakeven_profit_pct=_to_opt_float(breakeven_profit_pct),
                             breakeven_at_sl=bool(breakeven_at_sl),
-                            intraday_interval=intraday_interval,
                         )
                     )
                 except Exception as ee:

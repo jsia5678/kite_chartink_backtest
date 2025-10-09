@@ -2,7 +2,7 @@
 Trade Audit Module - Self-auditing trade log system
 
 This module ensures trades follow defined strategy rules by:
-1. Detecting strategy type (Intraday, Swing)
+1. Detecting strategy type (Swing)
 2. Validating entry/exit timings
 3. Checking holding period limits
 4. Verifying exit reasons match actual triggers
@@ -23,7 +23,6 @@ import pytz
 
 class StrategyType(Enum):
     """Strategy types with their specific rules"""
-    INTRADAY = "intraday"
     SWING = "swing"
 
 
@@ -44,15 +43,6 @@ class TradeAuditor:
     
     # Strategy rules definitions
     STRATEGY_RULES = {
-        StrategyType.INTRADAY: StrategyRules(
-            strategy_type=StrategyType.INTRADAY,
-            max_holding_days=1,
-            allowed_entry_times=[dt.time(9, 15), dt.time(9, 30), dt.time(10, 0), dt.time(10, 30), dt.time(11, 0)],
-            allowed_exit_times=[dt.time(15, 15), dt.time(15, 30)],
-            overnight_allowed=False,
-            exit_at_close_required=True,
-            description="Intraday: No overnight carry, exit same day"
-        ),
         StrategyType.SWING: StrategyRules(
             strategy_type=StrategyType.SWING,
             max_holding_days=30,  # Configurable
@@ -73,17 +63,13 @@ class TradeAuditor:
         Detect strategy type based on entry/exit patterns and holding period
         """
         
-        # Intraday: Entry during market hours (9:15-15:00), same day exit
-        if (self._is_time_in_range(entry_time, dt.time(9, 15), dt.time(15, 0)) and
-            holding_days <= 1):
-            return StrategyType.INTRADAY
         
         # Swing: Longer holding period, multiple days allowed
         if holding_days > 1 or num_days_param > 2:
             return StrategyType.SWING
         
-        # Default to intraday for ambiguous cases
-        return StrategyType.INTRADAY
+        # Default to swing for all cases
+        return StrategyType.SWING
     
     def _is_time_in_range(self, time_to_check: dt.time, start: dt.time, end: dt.time) -> bool:
         """Check if time is within range (inclusive)"""
@@ -220,14 +206,7 @@ class TradeAuditor:
         """Apply strategy-specific corrections to trade"""
         corrected = trade.copy()
         
-        if strategy_type == StrategyType.INTRADAY:
-            # Intraday: Ensure same day exit
-            corrected["Exit Date"] = trade.get("Entry Date")
-            corrected["Exit Time"] = "15:30"  # Market close
-            if trade.get("Exit Reason") not in ["TP", "SL"]:
-                corrected["Exit Reason"] = "Intraday_Close"
-                
-        elif strategy_type == StrategyType.SWING:
+        if strategy_type == StrategyType.SWING:
             # Swing: Allow multi-day but validate exit conditions
             if trade.get("Exit Reason") not in ["TP", "SL"]:
                 corrected["Exit Reason"] = "Swing_Time"

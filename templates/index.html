@@ -20,12 +20,31 @@
         <button class="btn btn-secondary" onclick="document.getElementById('how-it-works').scrollIntoView({behavior:'smooth'})">
           How it Works
         </button>
-        <button class="btn btn-secondary" onclick="window.location.href='/setup'">
-          ⚙️ API Settings
-        </button>
-        <button class="btn btn-secondary" onclick="window.location.href='/logout'">
-          🚪 Logout
-        </button>
+        <div class="user-menu">
+          <button class="btn-icon" id="user-menu-btn" onclick="toggleUserMenu()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="8" r="4"/>
+              <path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/>
+            </svg>
+          </button>
+          <div class="dropdown-menu" id="user-dropdown">
+            <a href="/setup" class="dropdown-item">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M12 1v6m0 6v6M5.6 5.6l4.2 4.2m4.2 4.2l4.2 4.2M1 12h6m6 0h6M5.6 18.4l4.2-4.2m4.2-4.2l4.2-4.2"/>
+              </svg>
+              API Settings
+            </a>
+            <a href="/logout" class="dropdown-item text-danger">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+              Logout
+            </a>
+          </div>
+        </div>
       </nav>
       </div>
     </header>
@@ -348,6 +367,22 @@
       document.getElementById('ai-btn-text').style.display = 'none';
       document.getElementById('ai-btn-loading').style.display = 'inline-block';
       btn.disabled = true;
+    });
+
+    // User menu dropdown
+    function toggleUserMenu() {
+      const dropdown = document.getElementById('user-dropdown');
+      dropdown.classList.toggle('show');
+    }
+
+    // Close dropdown when clicking outside
+    window.addEventListener('click', function(e) {
+      if (!e.target.matches('.btn-icon') && !e.target.closest('.btn-icon')) {
+        const dropdown = document.getElementById('user-dropdown');
+        if (dropdown && dropdown.classList.contains('show')) {
+          dropdown.classList.remove('show');
+        }
+      }
     });
 
     // Fade-in animation on scroll

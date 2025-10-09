@@ -30,7 +30,7 @@ def create_sample_trades():
             "Exit Time": "09:15",
             "Exit Price": 3600.0,
             "Return %": 2.86,
-            "Exit Reason": "BTST_Open"
+            "Exit Reason": "Time"
         },
         {
             "Stock": "INFY",
@@ -105,7 +105,7 @@ def main():
     print(audited_df[['Stock', 'Strategy_Type', 'Audit_Status', 'Violations']].to_string(index=False))
     
     print(f"\n🎯 Key Features Demonstrated:")
-    print("• Automatic strategy type detection (Intraday, BTST, Swing)")
+    print("• Automatic strategy type detection (Intraday, Swing)")
     print("• Entry/exit timing validation")
     print("• Holding period validation")
     print("• Exit reason validation")

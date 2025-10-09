@@ -8,7 +8,6 @@ The Trade Audit System is a self-auditing tool that ensures trades follow define
 
 ### 🔍 Strategy Type Detection
 - **Intraday**: Same-day trades, no overnight carry
-- **BTST (Buy Today Sell Tomorrow)**: Entry near close, exit at next day open
 - **Swing**: Multi-day holding, exit at target/SL only
 
 ### ✅ Validation Rules
@@ -30,13 +29,6 @@ The Trade Audit System is a self-auditing tool that ensures trades follow define
 - Ensures accurate performance metrics
 
 ### 🔧 Automatic Corrections
-
-#### BTST Strategy
-- Corrects exit to next day open (09:15-09:25)
-- Gap-up detection: Exit at 09:15 if open > entry * 1.005
-- Gap-down detection: Exit at 09:15 if open < entry * 0.995
-- No gap: Exit at 09:25 at entry price
-- Sets proper exit reasons: "BTST_GapUp", "BTST_GapDown", or "BTST_NoGap"
 
 #### Intraday Strategy
 - Ensures same-day exit at market close (15:30)
@@ -86,7 +78,7 @@ if enable_audit:
 - **Common Violations**: Most frequent rule violations
 
 ### Trade-Level Results
-- **Strategy_Type**: Detected strategy (intraday/btst/swing)
+- **Strategy_Type**: Detected strategy (intraday/swing)
 - **Audit_Status**: PASS/FAIL/ERROR
 - **Violations**: List of specific rule violations
 - **Corrected Trade**: Trade data after applying corrections
@@ -104,21 +96,6 @@ StrategyRules(
 )
 ```
 
-### BTST Strategy
-```python
-StrategyRules(
-    max_holding_days=2,
-    allowed_entry_times=[15:15, 15:30],
-    allowed_exit_times=[09:15, 09:30, 10:00],
-    overnight_allowed=True,
-    exit_at_close_required=False
-)
-```
-
-**Gap Logic:**
-- **Gap-Up**: Exit at 09:15 if next day open > entry price * 1.005 (+0.5%)
-- **Gap-Down**: Exit at 09:15 if next day open < entry price * 0.995 (-0.5%)
-- **No Gap**: Exit at 09:25 at entry price if no significant gap
 
 ### Swing Strategy
 ```python

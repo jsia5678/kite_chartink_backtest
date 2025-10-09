@@ -28,8 +28,6 @@ def compute_entry_exit_for_row(
     # Build localized entry timestamp
     entry_dt_local = tz.localize(dt.datetime.combine(row.entry_date, row.entry_time))
     
-    # Detect if this is a BTST trade based on entry time
-    is_btst = row.entry_time >= dt.time(15, 15) and row.entry_time <= dt.time(15, 30)
 
     # Get instrument token
     token = kite.resolve_instrument_token(symbol=row.stock, exchange=exchange)
@@ -47,20 +45,10 @@ def compute_entry_exit_for_row(
         raise ValueError(f"No prior candle for {row.stock} at {entry_dt_local}")
     entry_price = float(candles_intraday.loc[entry_ts, "close"]) if "close" in candles_intraday.columns else float(candles_intraday.loc[entry_ts, "ohlc"]["close"])  # type: ignore
 
-    # Scheduled exit date after N trading days
+    # Defaults - regular trades: Exit at market close
     exit_trade_date = trading_days_ahead(entry_dt_local.date(), num_days)
-
-    # Defaults - adjust for BTST trades
-    if is_btst:
-        # BTST: Exit next day at market open
-        exit_trade_date = trading_days_ahead(entry_dt_local.date(), 1)
-        exit_ts = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(9, 15)))
-        exit_time_str = "09:15"
-        exit_reason = "BTST_Open"
-    else:
-        # Regular trades: Exit at market close
-        exit_ts = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(15, 30)))
-        exit_time_str = "15:30"
+    exit_ts = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(15, 30)))
+    exit_time_str = "15:30"
     exit_reason = "Time"
     
     exit_price: Optional[float] = None
@@ -105,48 +93,8 @@ def compute_entry_exit_for_row(
                     exit_ts = ts
                     break
 
-    # If neither SL nor TP triggered, handle exit based on strategy type
+    # If neither SL nor TP triggered, handle exit at market close
     if exit_price is None:
-        if is_btst:
-            # BTST: Exit at next day open with gap-up logic
-            day_start = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(9, 0)))
-            day_end = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(9, 30)))
-            intraday_exit = kite.fetch_ohlc(token=token, interval=intraday_interval, start=day_start, end=day_end, tz=tz)
-            
-            if not intraday_exit.empty:
-                # Get opening price (first candle of the day)
-                open_ts = intraday_exit.index[0]
-                open_price = float(intraday_exit.iloc[0]["open"])  # type: ignore
-                
-                # Check for gap-up or gap-down (0.5% threshold)
-                gap_up_threshold = entry_price * 1.005
-                gap_down_threshold = entry_price * 0.995
-                
-                if open_price > gap_up_threshold:
-                    # Gap-up: Exit at open with profit
-                    exit_ts = open_ts
-                    exit_price = open_price
-                    exit_reason = "BTST_GapUp"
-                    exit_time_str = "09:15"
-                elif open_price < gap_down_threshold:
-                    # Gap-down: Exit at open with loss (cut losses quickly)
-                    exit_ts = open_ts
-                    exit_price = open_price
-                    exit_reason = "BTST_GapDown"
-                    exit_time_str = "09:15"
-                else:
-                    # No significant gap, sell at entry price
-                    exit_ts = open_ts
-                    exit_price = entry_price
-                    exit_reason = "BTST_NoGap"
-                    exit_time_str = "09:25"
-            else:
-                # Fallback for BTST
-                exit_price = entry_price
-                exit_reason = "BTST_NoGap"
-                exit_time_str = "09:25"
-        else:
-            # Regular trades: Exit at market close
         day_start = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(9, 0)))
         day_end = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(15, 30)))
         intraday_exit = kite.fetch_ohlc(token=token, interval=intraday_interval, start=day_start, end=day_end, tz=tz)

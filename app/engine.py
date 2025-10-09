@@ -22,6 +22,12 @@ def compute_entry_exit_batch(
     tp_pct: Optional[float] = None,
     breakeven_profit_pct: Optional[float] = None,
     breakeven_at_sl: bool = False,
+    sl_mode: str = "fixed",                 # fixed | atr
+    atr_multiplier: Optional[float] = None,  # if None, derive from cap (Small=1.5, Mid=1.8, Large=2.0)
+    gap_filter_pct: Optional[float] = 1.5,   # skip entries if overnight gap > this % (abs)
+    exclude_open_minutes: bool = False,      # exclude 9:15-9:30 entries
+    exclude_midday: bool = False,            # exclude 12:00-13:30 entries
+    exclude_after_3pm: bool = False,         # exclude entries after 15:00
 ) -> List[dict]:
     """Optimized batch processing for multiple trades"""
     results = []
@@ -70,6 +76,15 @@ def compute_entry_exit_batch(
         # Process all trades for this stock
         for i, row in trade_list:
             try:
+                # Optional time windows filtering at ingestion level
+                et = row.entry_time
+                if exclude_open_minutes and (et >= dt.time(9,15) and et < dt.time(9,30)):
+                    continue
+                if exclude_midday and (et >= dt.time(12,0) and et < dt.time(13,30)):
+                    continue
+                if exclude_after_3pm and (et >= dt.time(15,0)):
+                    continue
+
                 result = compute_entry_exit_for_row(
                     kite=kite,
                     row=row,
@@ -80,9 +95,13 @@ def compute_entry_exit_batch(
                     tp_pct=tp_pct,
                     breakeven_profit_pct=breakeven_profit_pct,
                     breakeven_at_sl=breakeven_at_sl,
-                    daily_data_cache=daily_data_cache
+                    daily_data_cache=daily_data_cache,
+                    sl_mode=sl_mode,
+                    atr_multiplier=atr_multiplier,
+                    gap_filter_pct=gap_filter_pct,
                 )
-                results.append(result)
+                if result is not None:
+                    results.append(result)
             except Exception as e:
                 # Handle individual trade errors
                 results.append({
@@ -113,6 +132,9 @@ def compute_entry_exit_for_row(
     breakeven_profit_pct: Optional[float] = None,
     breakeven_at_sl: bool = False,
     daily_data_cache: Optional[Dict[str, pd.DataFrame]] = None,
+    sl_mode: str = "fixed",
+    atr_multiplier: Optional[float] = None,
+    gap_filter_pct: Optional[float] = 1.5,
 ) -> dict:
     # Build localized entry timestamp
     entry_dt_local = tz.localize(dt.datetime.combine(row.entry_date, row.entry_time))
@@ -154,6 +176,25 @@ def compute_entry_exit_for_row(
     
     entry_price = float(daily_data.iloc[entry_pos]["close"])  # type: ignore
 
+    # Gap filter: compare today's open vs previous close
+    if gap_filter_pct is not None and entry_pos + 1 < len(daily_data):
+        prev_close = float(daily_data.iloc[entry_pos]["close"])  # previous day close (since entry_pos points to <= entry_date)
+        # find next row which is the entry_date row (if entry_pos corresponds to day before when entries are intraday)
+        # safer: locate exact date
+        try:
+            idx_on_date = None
+            for i, d in enumerate(daily_dates):
+                if d == entry_date:
+                    idx_on_date = i
+                    break
+            if idx_on_date is not None and "open" in daily_data.columns:
+                today_open = float(daily_data.iloc[idx_on_date]["open"])  # type: ignore
+                gap_pct = abs((today_open - prev_close) / prev_close) * 100.0 if prev_close else 0.0
+                if gap_pct > float(gap_filter_pct):
+                    return None  # skip this trade entirely
+        except Exception:
+            pass
+
     # Compute cap-based max holding days
     cap_to_max_days = {
         "SMALL": 5,
@@ -178,17 +219,63 @@ def compute_entry_exit_for_row(
 
     # Defaults - regular trades: Exit at market close based on effective_days
     exit_trade_date = trading_days_ahead(entry_dt_local.date(), effective_days)
-    exit_ts = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(15, 30)))
-    exit_time_str = "15:30"
+        exit_ts = tz.localize(dt.datetime.combine(exit_trade_date, dt.time(15, 30)))
+        exit_time_str = "15:30"
     exit_reason = "Time"
     
     exit_price: Optional[float] = None
 
-    # For swing trades, SL/TP is checked at daily close only
-    if (sl_pct is not None and sl_pct > 0) or (tp_pct is not None and tp_pct > 0):
+    # Determine SL/TP based on mode
+    target_price = None
+    stop_price = None
+    if sl_mode == "atr":
+        # compute ATR(14) using daily ohlc up to entry date (exclusive)
+        try:
+            import numpy as np
+            highs = pd.to_numeric(daily_data.get("high"), errors="coerce").astype(float)
+            lows = pd.to_numeric(daily_data.get("low"), errors="coerce").astype(float)
+            closes = pd.to_numeric(daily_data.get("close"), errors="coerce").astype(float)
+            tr_list = []
+            prev_close = None
+            for h, l, c in zip(highs, lows, closes):
+                if prev_close is None:
+                    tr = h - l
+                else:
+                    tr = max(h - l, abs(h - prev_close), abs(l - prev_close))
+                tr_list.append(tr)
+                prev_close = c
+            atr_series = pd.Series(tr_list).rolling(14).mean()
+            # pick ATR on the bar prior to entry date
+            atr_value = None
+            for i in range(len(daily_data)):
+                if daily_dates[i] == entry_date:
+                    atr_value = float(atr_series.iloc[max(i-1, 0)])
+                    break
+            if atr_value is None:
+                atr_value = float(atr_series.iloc[-1])
+            # derive multiplier default by cap
+            mult = atr_multiplier
+            if mult is None:
+                cap = (row.cap_bucket or "").upper() if getattr(row, "cap_bucket", None) else ""
+                mult = 1.5 if cap.startswith("SMALL") else 1.8 if cap.startswith("MID") else 2.0
+            # convert to prices
+            stop_price = max(0.0, entry_price - mult * atr_value)
+            if tp_pct is not None and tp_pct > 0:
+                target_price = entry_price * (1.0 + tp_pct / 100.0)
+            else:
+                target_price = entry_price + mult * atr_value
+        except Exception:
+            # fallback to fixed
+            if (sl_pct is not None and sl_pct > 0) or (tp_pct is not None and tp_pct > 0):
+                target_price = entry_price * (1.0 + (tp_pct or 0.0) / 100.0) if tp_pct else None
+                stop_price = entry_price * (1.0 - (sl_pct or 0.0) / 100.0) if sl_pct else None
+    else:
+        if (sl_pct is not None and sl_pct > 0) or (tp_pct is not None and tp_pct > 0):
         target_price = entry_price * (1.0 + (tp_pct or 0.0) / 100.0) if tp_pct else None
-        stop_price = entry_price * (1.0 - (sl_pct or 0.0) / 100.0) if sl_pct else None
+            stop_price = entry_price * (1.0 - (sl_pct or 0.0) / 100.0) if sl_pct else None
         
+    # For swing trades, SL/TP is checked at daily close only
+    if target_price is not None or stop_price is not None:
         # Optimize SL/TP checking with vectorized operations
         if entry_pos + 1 < len(daily_data):
             # Get all closes from entry date onwards
@@ -229,7 +316,7 @@ def compute_entry_exit_for_row(
         
         exit_ts = daily_data.index[exit_pos]
         exit_price = float(daily_data.iloc[exit_pos]["close"])  # type: ignore
-        exit_ts_local = exit_ts.astimezone(tz)
+            exit_ts_local = exit_ts.astimezone(tz)
         # Exit time enforcement: disallow 00:00 and force <= 15:25
         if exit_ts_local.hour == 0 and exit_ts_local.minute == 0:
             # shift to market close
@@ -282,16 +369,16 @@ def run_backtest_from_csv(
         rows = [r for r in rows if r.entry_time.strftime("%H:%M") in allowed_set]
     # Use optimized batch processing
     results = compute_entry_exit_batch(
-        kite=kite,
+                    kite=kite,
         rows=rows,
-        num_days=num_days,
-        exchange=exchange,
-        tz=tz,
-        sl_pct=sl_pct,
-        tp_pct=tp_pct,
-        breakeven_profit_pct=breakeven_profit_pct,
-        breakeven_at_sl=breakeven_at_sl,
-    )
+                    num_days=num_days,
+                    exchange=exchange,
+                    tz=tz,
+                    sl_pct=sl_pct,
+                    tp_pct=tp_pct,
+                    breakeven_profit_pct=breakeven_profit_pct,
+                    breakeven_at_sl=breakeven_at_sl,
+            )
 
     df = pd.DataFrame(results)
 

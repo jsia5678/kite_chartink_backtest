@@ -46,8 +46,18 @@ class TradeAuditor:
         StrategyType.SWING: StrategyRules(
             strategy_type=StrategyType.SWING,
             max_holding_days=30,  # Configurable
-            allowed_entry_times=[dt.time(9, 15), dt.time(9, 30), dt.time(10, 0), dt.time(15, 15), dt.time(15, 30)],
-            allowed_exit_times=[dt.time(9, 15), dt.time(9, 30), dt.time(10, 0), dt.time(15, 15), dt.time(15, 30)],
+            allowed_entry_times=[
+                dt.time(9, 15), dt.time(9, 30), dt.time(10, 0), dt.time(10, 15), dt.time(10, 30), 
+                dt.time(11, 0), dt.time(11, 15), dt.time(11, 30), dt.time(12, 0), dt.time(12, 15),
+                dt.time(12, 30), dt.time(13, 0), dt.time(13, 15), dt.time(13, 30), dt.time(14, 0),
+                dt.time(14, 15), dt.time(14, 30), dt.time(15, 0), dt.time(15, 15), dt.time(15, 30)
+            ],
+            allowed_exit_times=[
+                dt.time(9, 15), dt.time(9, 30), dt.time(10, 0), dt.time(10, 15), dt.time(10, 30), 
+                dt.time(11, 0), dt.time(11, 15), dt.time(11, 30), dt.time(12, 0), dt.time(12, 15),
+                dt.time(12, 30), dt.time(13, 0), dt.time(13, 15), dt.time(13, 30), dt.time(14, 0),
+                dt.time(14, 15), dt.time(14, 30), dt.time(15, 0), dt.time(15, 15), dt.time(15, 30)
+            ],
             overnight_allowed=True,
             exit_at_close_required=False,
             description="Swing: Multi-day holding, exit at target/SL only"
@@ -273,7 +283,8 @@ class TradeAuditor:
             "error_trades": error_trades,
             "pass_rate": (passed_trades / total_trades * 100) if total_trades > 0 else 0,
             "strategy_distribution": strategy_counts,
-            "common_violations": self._get_common_violations(audit_results)
+            "common_violations": self._get_common_violations(audit_results),
+            "called_trades": total_trades  # Add the missing CALLED TRADES field
         }
     
     def _get_common_violations(self, audit_results: List[Dict[str, Any]]) -> List[Tuple[str, int]]:

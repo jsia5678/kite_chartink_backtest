@@ -686,7 +686,8 @@ async def ui_ai_summary(request: Request, bt_json: str = Form(...)):
         content = await _pplx_chat(request, [{"role": "system", "content": system}, {"role": "user", "content": user}])
         return PlainTextResponse(content)
     except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=400)
+        # Provide fallback when AI is unavailable
+        return PlainTextResponse("AI analysis unavailable. Please set PPLX_API_KEY environment variable for AI features.")
 
 
 @app.post("/ui/ai_chat")
@@ -700,7 +701,8 @@ async def ui_ai_chat(request: Request, question: str = Form(...), bt_json: str =
         content = await _pplx_chat(request, [{"role": "system", "content": system}, {"role": "user", "content": user}])
         return PlainTextResponse(content)
     except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=400)
+        # Provide fallback when AI is unavailable
+        return PlainTextResponse("AI chat unavailable. Please set PPLX_API_KEY environment variable for AI features.")
 
 
 @app.post("/ui/export_csv")
